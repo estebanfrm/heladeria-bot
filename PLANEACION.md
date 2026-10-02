@@ -530,9 +530,11 @@ WA_VERIFY_TOKEN=
 WA_APP_SECRET=
 
 # IA
-IA_PROVIDER=gemini        # gemini | groq | ollama | openai | anthropic
+IA_PROVIDER=gemini        # gemini | groq | ollama | openai (API compatible con OpenAI) | anthropic (pendiente)
 IA_MODEL=
 IA_API_KEY=
+IA_BASE_URL=              # opcional: otra URL compatible con OpenAI
+IA_TIMEOUT=20
 
 # Límites
 WEB_CHAT_MAX_MSGS_PER_SESSION=20
@@ -583,7 +585,7 @@ WEB_CHAT_MAX_MSGS_PER_SESSION=20
 - [x] Modelos SQLAlchemy + migraciones Alembic
 - [x] Carga de semillas
 - [x] Carrito y reglas: validación de opciones, adicionales, total
-- [ ] Servicio de IA (interfaz + 1 proveedor) → texto a JSON
+- [x] Servicio de IA (interfaz + 1 proveedor) → texto a JSON (`app/ia/`: un cliente compatible con OpenAI cubre gemini, groq, ollama y openai)
 - [ ] Motor de conversación (máquina de estados)
 - [ ] Endpoint de prueba `/chat` + pruebas con pytest usando los mensajes del chat real
 
@@ -650,7 +652,7 @@ WEB_CHAT_MAX_MSGS_PER_SESSION=20
 - [ ] Permiso para usar nombre/menú real en el portafolio
 
 **Técnicos:**
-- [ ] Elegir proveedor de IA gratis para el demo (probar Gemini vs Groq con los casos reales)
+- [ ] Elegir proveedor de IA gratis para el demo (probar Gemini vs Groq con los casos reales: `uv run python -m app.ia.evaluar` con cada uno en `.env`)
 - [x] Nombre del repositorio (`heladeria-bot`)
 
 ---
