@@ -15,15 +15,18 @@ services:
       retries: 10
 
   backend:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     env_file: .env
     environment:
       DATABASE_URL: postgresql+psycopg://heladeria:heladeria@db:5432/heladeria
-      SEED_FILE: /seeds/demo.json
     ports:
       - "8000:8000"
     volumes:
-      - ./seeds:/seeds:ro
+      # Seeds del host sobre los de la imagen: permite usar seeds/heladeria.json
+      # (SEED_FILE=seeds/heladeria.json en .env) sin meterlo nunca en la imagen.
+      - ./seeds:/app/seeds:ro
     depends_on:
       db:
         condition: service_healthy

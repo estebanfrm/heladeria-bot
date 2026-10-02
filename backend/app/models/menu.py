@@ -4,7 +4,7 @@ Cada tabla tiene una PK entera y un `codigo` estable (el `id` del seed, ej. "cop
 que es lo que ve la IA. Los precios viven aquí y solo los usa el código, nunca la IA.
 """
 
-from sqlalchemy import CheckConstraint, ForeignKey, UniqueConstraint
+from sqlalchemy import CheckConstraint, ForeignKey, UniqueConstraint, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base, enum_texto
@@ -23,6 +23,8 @@ class Negocio(Base):
     horario: Mapped[str] = mapped_column(default="")
     costo_domicilio: Mapped[int] = mapped_column(default=0)
     nota_domicilio: Mapped[str] = mapped_column(default="")
+    # `version` del seed aplicado; el arranque solo recarga si el seed trae una mayor
+    version_menu: Mapped[int] = mapped_column(default=0, server_default="0")
 
 
 class Categoria(Base):
@@ -32,6 +34,7 @@ class Categoria(Base):
     codigo: Mapped[str] = mapped_column(unique=True)
     nombre: Mapped[str]
     orden: Mapped[int] = mapped_column(default=0)
+    activo: Mapped[bool] = mapped_column(default=True, server_default=true())
 
     productos: Mapped[list["Producto"]] = relationship(back_populates="categoria")
 
@@ -45,6 +48,7 @@ class GrupoOpcion(Base):
     codigo: Mapped[str] = mapped_column(unique=True)
     tipo: Mapped[TipoGrupo] = mapped_column(enum_texto(TipoGrupo))
     nombre: Mapped[str]
+    activo: Mapped[bool] = mapped_column(default=True, server_default=true())
 
     opciones: Mapped[list["Opcion"]] = relationship(
         back_populates="grupo", order_by="Opcion.id", cascade="all, delete-orphan"
@@ -62,7 +66,8 @@ class Opcion(Base):
     grupo_id: Mapped[int] = mapped_column(ForeignKey("grupo_opcion.id", ondelete="CASCADE"))
     codigo: Mapped[str]
     nombre: Mapped[str]
-    disponible: Mapped[bool] = mapped_column(default=True)  # False = agotado
+    disponible: Mapped[bool] = mapped_column(default=True)  # False = agotado hoy (panel)
+    activo: Mapped[bool] = mapped_column(default=True, server_default=true())  # sigue en la carta
 
     grupo: Mapped[GrupoOpcion] = relationship(back_populates="opciones")
 

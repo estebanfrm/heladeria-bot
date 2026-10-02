@@ -1,0 +1,10 @@
+# El contexto del build es la raíz del repo. Lista blanca: solo entra lo que copia
+# backend/Dockerfile. Así .env, seeds/heladeria.json, .git, .venv, etc. nunca llegan a la imagen.
+*
+!backend/pyproject.toml
+!backend/uv.lock
+!backend/app
+!backend/alembic.ini
+!backend/migrations
+!seeds/demo.json
+**/__pycache__

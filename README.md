@@ -43,6 +43,7 @@ docker compose up -d db
 cd backend
 uv sync
 uv run alembic upgrade head
+uv run python -m app.menu.carga     # carga seeds/demo.json en la BD
 uv run uvicorn app.main:app --reload
 ```
 

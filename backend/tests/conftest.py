@@ -16,9 +16,17 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.menu.schema import Menu, cargar_menu
 
 BACKEND = Path(__file__).resolve().parents[1]
+SEED_DEMO = BACKEND.parent / "seeds" / "demo.json"
 URL_TEST = make_url(settings.database_url).set(database="heladeria_test")
+
+
+@pytest.fixture
+def menu_demo() -> Menu:
+    """Menú de seeds/demo.json, recién leído (cada test puede modificarlo)."""
+    return cargar_menu(SEED_DEMO)
 
 
 def alembic_config(connection: Connection) -> Config:
