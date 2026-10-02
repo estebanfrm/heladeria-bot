@@ -99,7 +99,8 @@ class Menu(BaseModel):
                 errores.append(f"IDs repetidos en {nombre}")
             return set(ids)
 
-        grupos = unicos("grupos_opciones", [g.id for g in self.grupos_opciones])
+        unicos("grupos_opciones", [g.id for g in self.grupos_opciones])
+        tipos = {g.id: g.tipo for g in self.grupos_opciones}
         categorias = unicos("categorias", [c.id for c in self.categorias])
         unicos("productos", [p.id for p in self.productos])
         unicos("adicionales", [a.id for a in self.adicionales])
@@ -109,13 +110,14 @@ class Menu(BaseModel):
             if p.categoria not in categorias:
                 errores.append(f"Producto '{p.id}': categoría '{p.categoria}' no existe")
             for s in p.selecciones:
-                if s.grupo not in grupos:
+                if s.grupo not in tipos:
                     errores.append(f"Producto '{p.id}': grupo '{s.grupo}' no existe")
-            usados = [s.grupo for s in p.selecciones]
+            # Un grupo por tipo: así el carrito (y la IA) eligen por tipo sin ambigüedad
+            usados = [tipos[s.grupo] for s in p.selecciones if s.grupo in tipos]
             if len(usados) != len(set(usados)):
-                errores.append(f"Producto '{p.id}': grupo repetido en selecciones")
+                errores.append(f"Producto '{p.id}': dos grupos del mismo tipo en selecciones")
         for a in self.adicionales:
-            if a.grupo and a.grupo not in grupos:
+            if a.grupo and a.grupo not in tipos:
                 errores.append(f"Adicional '{a.id}': grupo '{a.grupo}' no existe")
         for m in self.medios_pago:
             if m.requiere_comprobante and not m.cuenta:

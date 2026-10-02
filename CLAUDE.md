@@ -39,6 +39,8 @@ backend/app/db.py            Base SQLAlchemy, engine, SessionLocal, get_db
 backend/app/models/          modelos de BD: menu.py, conversaciones.py, pedidos.py
 backend/app/menu/schema.py   modelos Pydantic + validación del menú semilla
 backend/app/menu/carga.py    seed → BD (sincroniza por codigo) y BD → Menu (carta vigente)
+backend/app/pedidos/carrito.py  ItemSolicitado (lo que entrega la IA: solo códigos) → validación,
+                             faltantes, problemas y montos (precios del Menu, nunca de la IA)
 backend/migrations/          Alembic (env.py toma DATABASE_URL de settings)
 backend/tests/               pytest (conftest.py: BD heladeria_test en Postgres real)
 seeds/demo.json              menú completo (26 productos, 11 sabores, adicionales, medios de pago ficticios)
@@ -83,8 +85,8 @@ docker build -f backend/Dockerfile .        # solo la imagen, como en Render (co
 - ✅ Fase 0: estructura del repo, menú semilla validado. Repo: https://github.com/estebanfrm/heladeria-bot
 - 🔄 **Fase 1 — Núcleo (sin WhatsApp)**, en este orden:
   1. ✅ Modelos SQLAlchemy + migraciones `0001`–`0002` (sección 8 de `PLANEACION.md`).
-  2. ✅ Carga del seed a la BD; `/menu` lee de Postgres. 20 tests pasando.
-  3. ⏭️ **Siguiente:** carrito y reglas: validar selecciones por producto, adicionales y total. Tests con el caso real de $24.000.
-  4. Servicio de IA (interfaz + 1 proveedor) → texto a JSON validado.
+  2. ✅ Carga del seed a la BD; `/menu` lee de Postgres.
+  3. ✅ Carrito y reglas (`app/pedidos/carrito.py`): caso real de $24.000. 38 tests pasando.
+  4. ⏭️ **Siguiente:** servicio de IA (interfaz + 1 proveedor) → texto a JSON validado.
   5. Motor de conversación (máquina de estados, sección 7).
   6. Endpoint `/chat` de prueba + tests con los mensajes del chat real.
