@@ -46,11 +46,11 @@ def test_demo_no_usa_cuentas_reales(menu):
             assert set(m.cuenta.replace(" ", "").replace("-", "")) <= {"0", "3"}
 
 
-def test_grupo_repetido_en_producto_falla(menu):
+def test_dos_grupos_del_mismo_tipo_en_producto_falla(menu):
     datos = menu.model_dump()
     copa = next(p for p in datos["productos"] if p["id"] == "copa_queso")
-    copa["selecciones"].append({"grupo": "sabores", "cantidad": 1})
-    with pytest.raises(ValueError, match="'copa_queso': grupo repetido"):
+    copa["selecciones"].append({"grupo": "salsas_generales", "cantidad": 1})
+    with pytest.raises(ValueError, match="'copa_queso': dos grupos del mismo tipo"):
         Menu.model_validate(datos)
 
 

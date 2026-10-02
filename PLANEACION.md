@@ -582,7 +582,7 @@ WEB_CHAT_MAX_MSGS_PER_SESSION=20
 ### Fase 1 — Núcleo (sin WhatsApp)
 - [x] Modelos SQLAlchemy + migraciones Alembic
 - [x] Carga de semillas
-- [ ] Carrito y reglas: validación de opciones, adicionales, total
+- [x] Carrito y reglas: validación de opciones, adicionales, total
 - [ ] Servicio de IA (interfaz + 1 proveedor) → texto a JSON
 - [ ] Motor de conversación (máquina de estados)
 - [ ] Endpoint de prueba `/chat` + pruebas con pytest usando los mensajes del chat real
