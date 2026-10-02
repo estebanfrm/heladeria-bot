@@ -586,7 +586,7 @@ WEB_CHAT_MAX_MSGS_PER_SESSION=20
 - [x] Carga de semillas
 - [x] Carrito y reglas: validación de opciones, adicionales, total
 - [x] Servicio de IA (interfaz + 1 proveedor) → texto a JSON (`app/ia/`: un cliente compatible con OpenAI cubre gemini, groq, ollama y openai)
-- [ ] Motor de conversación (máquina de estados)
+- [x] Motor de conversación (máquina de estados) — `app/conversacion/`: botones sin IA, texto con IA, 2 fallos → humano; temporizadores (30 min, recordatorios de pago) en la Fase 2
 - [ ] Endpoint de prueba `/chat` + pruebas con pytest usando los mensajes del chat real
 
 ### Fase 2 — Canales
