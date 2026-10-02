@@ -43,6 +43,9 @@ backend/app/pedidos/carrito.py  ItemSolicitado (lo que entrega la IA: solo códi
                              faltantes, problemas y montos (precios del Menu, nunca de la IA)
 backend/app/ia/              servicio de IA: prompt (menú sin precios) → proveedor → Interpretacion
                              validada; proveedores.py (compatible OpenAI + falso), casos.py (chat real)
+backend/app/conversacion/    motor.py (máquina de estados de la sección 7: Entrada → Respuestas)
+                             y mensajes.py (textos y botones del bot)
+backend/app/pedidos/servicio.py  crear_pedido: carrito validado → Pedido con copia de nombres y precios
 backend/migrations/          Alembic (env.py toma DATABASE_URL de settings)
 backend/tests/               pytest (conftest.py: BD heladeria_test en Postgres real)
 seeds/demo.json              menú completo (26 productos, 11 sabores, adicionales, medios de pago ficticios)
@@ -92,5 +95,5 @@ docker build -f backend/Dockerfile .        # solo la imagen, como en Render (co
   3. ✅ Carrito y reglas (`app/pedidos/carrito.py`): caso real de $24.000.
   4. ✅ Servicio de IA (`app/ia/`): gemini | groq | ollama | openai vía API compatible con OpenAI;
      anthropic pendiente. Falta elegir Gemini vs Groq con `app.ia.evaluar` (requiere API keys). 68 tests.
-  5. ⏭️ **Siguiente:** motor de conversación (máquina de estados, sección 7).
-  6. Endpoint `/chat` de prueba + tests con los mensajes del chat real.
+  5. ✅ Motor de conversación (`app/conversacion/`). IA del demo: Gemini `gemini-3.5-flash-lite`. 84 tests.
+  6. ⏭️ **Siguiente:** endpoint `/chat` de prueba + tests con los mensajes del chat real.
