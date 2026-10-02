@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     ia_provider: str = "gemini"
     ia_model: str = ""
     ia_api_key: str = ""
+    ia_base_url: str = ""  # opcional: otra URL compatible con OpenAI (ej. Ollama desde Docker)
+    ia_timeout: float = 20.0  # segundos
 
     # Límites
     web_chat_max_msgs_per_session: int = 20
