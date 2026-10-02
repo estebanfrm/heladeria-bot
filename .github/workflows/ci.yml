@@ -41,3 +41,23 @@ jobs:
           from app.menu.schema import cargar_menu; print(cargar_menu(settings.seed_file).negocio.nombre)"
       - name: La imagen no trae datos reales ni secretos
         run: docker run --rm heladeria-backend sh -c 'test ! -e /app/seeds/heladeria.json && test ! -e /app/.env'
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npx oxlint .
+      - run: npx eslint .
+      - run: npx prettier --check src/ index.html
+      - run: npm run type-check
+      - run: npx vitest run
+      - run: npm run build-only

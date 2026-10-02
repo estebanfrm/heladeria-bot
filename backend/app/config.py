@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     # App
     app_env: str = "development"
     app_base_url: str = "http://localhost:8000"
+    # Orígenes del frontend que pueden llamar a la API (separados por coma)
+    cors_origins: str = "http://localhost:5173"
     # Relativo a la raíz del repo, o absoluto (ej. un archivo secreto montado en producción)
     seed_file: Path = RAIZ / "seeds" / "demo.json"
 
@@ -48,6 +50,10 @@ class Settings(BaseSettings):
     @classmethod
     def _seed_relativo_a_la_raiz(cls, ruta: Path) -> Path:
         return ruta if ruta.is_absolute() else RAIZ / ruta
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip().rstrip("/") for o in self.cors_origins.split(",") if o.strip()]
 
     @property
     def staff_phone_list(self) -> list[str]:

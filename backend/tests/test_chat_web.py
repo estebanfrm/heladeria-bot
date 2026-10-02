@@ -135,3 +135,15 @@ def test_health_informa_el_estado_de_la_ia(api):
 
     assert cuerpo["status"] == "ok"
     assert "ia" in cuerpo
+
+
+@pytest.mark.parametrize(
+    ("origen", "permitido"),
+    [("http://localhost:5173", True), ("https://sitio-ajeno.test", False)],
+)
+def test_cors_solo_para_el_frontend_configurado(origen, permitido):
+    respuesta = TestClient(app).options(
+        "/chat",
+        headers={"Origin": origen, "Access-Control-Request-Method": "POST"},
+    )
+    assert (respuesta.headers.get("access-control-allow-origin") == origen) is permitido

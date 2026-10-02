@@ -249,7 +249,7 @@ Solo si más adelante se quiere que cualquier persona escriba al bot por WhatsAp
 | Control de versiones | Git + GitHub (`estebanfrm`) |
 | Contenedores | Docker Desktop (con WSL 2 en Windows) |
 | Python | Python 3.12 + **uv** (entornos y dependencias) |
-| Node | Node.js 22 LTS + pnpm |
+| Node | Node.js 22.18+ (recomendado 24 LTS) + **npm** (pnpm vía corepack falló con Node 22.14 y exigía permisos de admin) |
 | Base de datos local | PostgreSQL 16 en Docker + DBeaver como cliente gráfico |
 | Exponer el webhook local a Meta | **Cloudflare Tunnel** (`cloudflared`) o ngrok |
 | Probar la API | Swagger de FastAPI (`/docs`) + Bruno |
@@ -590,7 +590,7 @@ WEB_CHAT_MAX_MSGS_PER_SESSION=20
 - [x] Endpoint de prueba `/chat` + pruebas con pytest usando los mensajes del chat real (`app/canales/web.py`: límite de mensajes por sesión, 500 caracteres, sin IA configurada siguen los botones)
 
 ### Fase 2 — Canales
-- [ ] Chat web (widget Vue) contra `/chat`
+- [x] Chat web (widget Vue) contra `/chat` — `frontend/`: página de demo + widget (Vue 3, Vite, TS, Pinia, Tailwind 4); CORS por `CORS_ORIGINS`; probado de punta a punta con Ollama (pedido de $24.000)
 - [ ] Configurar app en Meta for Developers + número de prueba
 - [ ] Webhook de WhatsApp (verificación, firma, recepción, envío)
 - [ ] Mensajes interactivos (listas y botones)
