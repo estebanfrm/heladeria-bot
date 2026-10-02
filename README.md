@@ -17,9 +17,15 @@ FastAPI · PostgreSQL · SQLAlchemy · Alembic · Vue 3 · Docker · WhatsApp Cl
 ```
 ├── backend/            API FastAPI
 │   ├── app/
-│   │   ├── config.py   Configuración desde .env
-│   │   ├── main.py     Endpoints
-│   │   └── menu/       Esquema y validación del menú
+│   │   ├── config.py       Configuración desde .env
+│   │   ├── main.py         Endpoints (/health, /menu) + routers de canales
+│   │   ├── models/         Modelos SQLAlchemy (menú, conversaciones, pedidos)
+│   │   ├── menu/           Esquema del seed y carga a la BD
+│   │   ├── pedidos/        Carrito (reglas y montos) y registro de pedidos
+│   │   ├── ia/             IA intercambiable: prompt, proveedores, evaluación
+│   │   ├── conversacion/   Motor (máquina de estados) y textos del bot
+│   │   └── canales/        Adaptadores: chat web (/chat); WhatsApp en la Fase 2
+│   ├── migrations/         Alembic
 │   └── tests/
 ├── frontend/           Panel + chat web (Vue, Fase 2)
 ├── seeds/
@@ -46,6 +52,18 @@ uv run alembic upgrade head
 uv run python -m app.menu.carga     # carga seeds/demo.json en la BD
 uv run uvicorn app.main:app --reload
 ```
+
+## Probar el bot
+
+Con el backend arriba, abre http://localhost:8000/docs y usa `POST /chat`:
+
+```json
+{"texto": "Una copa queso con brownie y fresa y un banana split"}
+```
+
+La respuesta trae una `sesion`; mándala en los siguientes mensajes para seguir la misma conversación.
+Los botones se envían como `{"sesion": "...", "boton": "confirmar"}`. Para el texto libre hace falta
+`IA_API_KEY` (Gemini) en `.env`; sin ella `/health` muestra `"ia": "no configurada"` y solo responden los botones.
 
 ## Pruebas
 

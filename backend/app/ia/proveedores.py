@@ -85,6 +85,17 @@ class ProveedorFalso:
         return self.respuestas.pop(0)
 
 
+class ProveedorNoConfigurado:
+    """Reemplazo cuando falta configurar la IA: los botones siguen funcionando y cada texto
+    falla con el motivo (el motor lo cuenta como "no entendí" y lo deja en el log)."""
+
+    def __init__(self, motivo: str):
+        self.motivo = motivo
+
+    def completar_json(self, sistema: str, usuario: str) -> str:
+        raise ErrorIA(f"IA no configurada: {self.motivo}")
+
+
 def crear_proveedor(config: Settings) -> ProveedorIA:
     """Proveedor según .env (IA_PROVIDER, IA_MODEL, IA_API_KEY, IA_BASE_URL, IA_TIMEOUT)."""
     nombre = config.ia_provider.strip().lower()

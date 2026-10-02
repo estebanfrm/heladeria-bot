@@ -33,7 +33,8 @@ La planeación completa y todas las decisiones están en `PLANEACION.md` — lé
 
 ```
 backend/app/config.py        configuración desde .env (lee el .env de la raíz del repo)
-backend/app/main.py          endpoints (/health, /menu desde la BD)
+backend/app/main.py          endpoints (/health con estado de la IA, /menu desde la BD) + router del chat
+backend/app/canales/web.py   canal chat web: POST /chat {sesion?, texto, boton?} → motor (límite por sesión)
 backend/app/enums.py         valores cerrados del dominio (estados, canal, tipo de grupo…)
 backend/app/db.py            Base SQLAlchemy, engine, SessionLocal, get_db
 backend/app/models/          modelos de BD: menu.py, conversaciones.py, pedidos.py
@@ -89,11 +90,13 @@ docker build -f backend/Dockerfile .        # solo la imagen, como en Render (co
 ## Estado actual
 
 - ✅ Fase 0: estructura del repo, menú semilla validado. Repo: https://github.com/estebanfrm/heladeria-bot
-- 🔄 **Fase 1 — Núcleo (sin WhatsApp)**, en este orden:
+- ✅ **Fase 1 — Núcleo (sin WhatsApp)**:
   1. ✅ Modelos SQLAlchemy + migraciones `0001`–`0002` (sección 8 de `PLANEACION.md`).
   2. ✅ Carga del seed a la BD; `/menu` lee de Postgres.
   3. ✅ Carrito y reglas (`app/pedidos/carrito.py`): caso real de $24.000.
   4. ✅ Servicio de IA (`app/ia/`): gemini | groq | ollama | openai vía API compatible con OpenAI;
-     anthropic pendiente. Falta elegir Gemini vs Groq con `app.ia.evaluar` (requiere API keys). 68 tests.
-  5. ✅ Motor de conversación (`app/conversacion/`). IA del demo: Gemini `gemini-3.5-flash-lite`. 84 tests.
-  6. ⏭️ **Siguiente:** endpoint `/chat` de prueba + tests con los mensajes del chat real.
+     anthropic pendiente. IA del demo: Gemini `gemini-3.5-flash-lite` (falta la API key de Esteban).
+  5. ✅ Motor de conversación (`app/conversacion/`).
+  6. ✅ Endpoint `POST /chat` (canal web). 95 tests.
+- ⏭️ **Siguiente: Fase 2 — Canales** (sección 11 de `PLANEACION.md`), empezando por el chat web
+  (widget Vue contra `/chat`) y luego WhatsApp Cloud API (webhook, botones, notificación al personal).
