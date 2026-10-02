@@ -1,0 +1,293 @@
+{
+  "version": 1,
+  "negocio": {
+    "nombre": "Heladería Demo",
+    "moneda": "COP",
+    "ciudad": "Cali",
+    "horario": "Pendiente por confirmar",
+    "domicilio": {
+      "costo": 0,
+      "nota": "Pendiente por confirmar: costo y zonas de domicilio"
+    }
+  },
+  "_pendientes": [
+    "Listas de salsas y toppings para brownie con helado, ensalada de frutas y banana split (se usan las listas generales)",
+    "Salsas mora y fresa: se ofrecieron en el chat pero no están en el menú",
+    "Infantiles: ¿el cliente elige sabor de helado?",
+    "Costo y zonas de domicilio, horario"
+  ],
+  "grupos_opciones": [
+    {
+      "id": "sabores",
+      "nombre": "Sabor de helado",
+      "opciones": [
+        { "id": "vainilla_chips", "nombre": "Vainilla chips" },
+        { "id": "vainilla", "nombre": "Vainilla" },
+        { "id": "brownie", "nombre": "Brownie" },
+        { "id": "barrilete", "nombre": "Barrilete" },
+        { "id": "maracuya", "nombre": "Maracuyá" },
+        { "id": "mandarina_limon", "nombre": "Mandarina limón" },
+        { "id": "fresa", "nombre": "Fresa" },
+        { "id": "lulo", "nombre": "Lulo" },
+        { "id": "yogurt_frutos_rojos", "nombre": "Yogurt frutos rojos" },
+        { "id": "chocolate", "nombre": "Chocolate" },
+        { "id": "ron_con_pasas", "nombre": "Ron con pasas" }
+      ]
+    },
+    {
+      "id": "salsas_waffle",
+      "nombre": "Salsa",
+      "opciones": [
+        { "id": "frutos_rojos", "nombre": "Frutos rojos" },
+        { "id": "chocolate_hershey", "nombre": "Chocolate (Hershey)" },
+        { "id": "maracuya", "nombre": "Maracuyá" },
+        { "id": "leche_condensada", "nombre": "Leche condensada" }
+      ]
+    },
+    {
+      "id": "salsas_base",
+      "nombre": "Salsa",
+      "opciones": [
+        { "id": "frutos_rojos", "nombre": "Frutos rojos" },
+        { "id": "maracuya", "nombre": "Maracuyá" },
+        { "id": "lecherita", "nombre": "Lecherita" }
+      ]
+    },
+    {
+      "id": "salsas_generales",
+      "nombre": "Salsa",
+      "opciones": [
+        { "id": "frutos_rojos", "nombre": "Frutos rojos" },
+        { "id": "maracuya", "nombre": "Maracuyá" },
+        { "id": "lecherita", "nombre": "Lecherita" },
+        { "id": "mora", "nombre": "Mora" },
+        { "id": "fresa", "nombre": "Fresa" }
+      ]
+    },
+    {
+      "id": "toppings_waffle",
+      "nombre": "Topping",
+      "opciones": [
+        { "id": "mani", "nombre": "Maní" },
+        { "id": "barquillo", "nombre": "Barquillo" },
+        { "id": "pepitas_colores", "nombre": "Pepitas de colores" },
+        { "id": "oreo", "nombre": "Oreo triturado" },
+        { "id": "gomitas", "nombre": "Gomitas" },
+        { "id": "chips_chocolate", "nombre": "Chips de chocolate" },
+        { "id": "masmelos", "nombre": "Masmelos" },
+        { "id": "mym", "nombre": "M&M" }
+      ]
+    },
+    {
+      "id": "toppings_base",
+      "nombre": "Topping",
+      "opciones": [
+        { "id": "oreo", "nombre": "Oreo triturado" },
+        { "id": "mani", "nombre": "Maní" },
+        { "id": "lluvia_colores", "nombre": "Lluvia de colores" },
+        { "id": "pepitas_colores", "nombre": "Pepitas de colores" }
+      ]
+    },
+    {
+      "id": "frutas_waffle",
+      "nombre": "Fruta",
+      "opciones": [
+        { "id": "fresa", "nombre": "Fresa" },
+        { "id": "manzana", "nombre": "Manzana" },
+        { "id": "banano", "nombre": "Banano" }
+      ]
+    },
+    {
+      "id": "sabores_michelada",
+      "nombre": "Sabor de michelada",
+      "opciones": [
+        { "id": "frutos_rojos", "nombre": "Frutos rojos (fresa, manzana roja y uva)" },
+        { "id": "frutos_amarillos", "nombre": "Frutos amarillos (maracuyá y lulo)" },
+        { "id": "frutos_verdes", "nombre": "Frutos verdes (mango viche, kiwi y manzana verde)" }
+      ]
+    },
+    {
+      "id": "figuras_infantil",
+      "nombre": "Figura",
+      "opciones": [
+        { "id": "buho", "nombre": "Búho" },
+        { "id": "arana", "nombre": "Araña" },
+        { "id": "payaso", "nombre": "Payaso" },
+        { "id": "raton", "nombre": "Ratón" }
+      ]
+    }
+  ],
+  "categorias": [
+    { "id": "waffles", "nombre": "Waffles", "orden": 1 },
+    { "id": "copas", "nombre": "Copas", "orden": 2 },
+    { "id": "especiales", "nombre": "Especiales", "orden": 3 },
+    { "id": "malteadas", "nombre": "Malteadas", "orden": 4 },
+    { "id": "micheladas", "nombre": "Micheladas", "orden": 5 },
+    { "id": "granizados", "nombre": "Granizados", "orden": 6 },
+    { "id": "infantiles", "nombre": "Infantiles", "orden": 7 },
+    { "id": "conos", "nombre": "Conos y estrellas", "orden": 8 }
+  ],
+  "productos": [
+    {
+      "id": "waffle",
+      "nombre": "Waffle arma a tu gusto",
+      "categoria": "waffles",
+      "precio": 17000,
+      "descripcion": "Waffle artesanal, una fruta, una salsa, dos toppings, chantilly y un sabor de helado.",
+      "selecciones": [
+        { "grupo": "frutas_waffle", "cantidad": 1 },
+        { "grupo": "salsas_waffle", "cantidad": 1 },
+        { "grupo": "toppings_waffle", "cantidad": 2 },
+        { "grupo": "sabores", "cantidad": 1 }
+      ]
+    },
+    {
+      "id": "copa_frutos_rojos",
+      "nombre": "Copa frutos rojos",
+      "categoria": "copas",
+      "precio": 14000,
+      "descripcion": "Helado de vainilla y fresa, melado de frutos rojos, salsa de frutos rojos, chantilly y galleta.",
+      "selecciones": []
+    },
+    {
+      "id": "copa_acida",
+      "nombre": "Copa ácida",
+      "categoria": "copas",
+      "precio": 14000,
+      "descripcion": "Helado de vainilla y maracuyá, pulpa de maracuyá, salsa de maracuyá, chantilly y galleta.",
+      "selecciones": []
+    },
+    {
+      "id": "copa_queso",
+      "nombre": "Copa queso",
+      "categoria": "copas",
+      "precio": 12000,
+      "descripcion": "Dos sabores de helado, queso, chantilly, salsa, topping y galleta.",
+      "selecciones": [
+        { "grupo": "sabores", "cantidad": 2 },
+        { "grupo": "salsas_base", "cantidad": 1 },
+        { "grupo": "toppings_base", "cantidad": 1 }
+      ]
+    },
+    {
+      "id": "brownie_con_helado",
+      "nombre": "Brownie con helado",
+      "categoria": "especiales",
+      "precio": 10000,
+      "descripcion": "Brownie caliente, un sabor de helado, salsa, topping y galleta.",
+      "selecciones": [
+        { "grupo": "sabores", "cantidad": 1 },
+        { "grupo": "salsas_generales", "cantidad": 1 },
+        { "grupo": "toppings_base", "cantidad": 1 }
+      ]
+    },
+    {
+      "id": "ensalada_frutas",
+      "nombre": "Ensalada de frutas",
+      "categoria": "especiales",
+      "precio": 16000,
+      "descripcion": "5 frutas (piña calada, manzana, papaya, banano y fresa), queso, un sabor de helado, salsa y topping.",
+      "selecciones": [
+        { "grupo": "sabores", "cantidad": 1 },
+        { "grupo": "salsas_generales", "cantidad": 1 },
+        { "grupo": "toppings_base", "cantidad": 1 }
+      ]
+    },
+    {
+      "id": "banana_split",
+      "nombre": "Banana split",
+      "categoria": "especiales",
+      "precio": 12000,
+      "descripcion": "Tres sabores de helado, banano, chantilly, salsa, topping y galleta.",
+      "selecciones": [
+        { "grupo": "sabores", "cantidad": 3 },
+        { "grupo": "salsas_generales", "cantidad": 1 },
+        { "grupo": "toppings_base", "cantidad": 1 }
+      ]
+    },
+    {
+      "id": "malteada_12oz",
+      "nombre": "Malteada 12 oz",
+      "categoria": "malteadas",
+      "precio": 12000,
+      "descripcion": "Sabor de helado a elección, salsa, topping y chantilly.",
+      "selecciones": [
+        { "grupo": "sabores", "cantidad": 1 },
+        { "grupo": "salsas_base", "cantidad": 1 },
+        { "grupo": "toppings_base", "cantidad": 1 }
+      ]
+    },
+    {
+      "id": "malteada_16oz",
+      "nombre": "Malteada 16 oz",
+      "categoria": "malteadas",
+      "precio": 14000,
+      "descripcion": "Sabor de helado a elección, salsa, topping y chantilly.",
+      "selecciones": [
+        { "grupo": "sabores", "cantidad": 1 },
+        { "grupo": "salsas_base", "cantidad": 1 },
+        { "grupo": "toppings_base", "cantidad": 1 }
+      ]
+    },
+    {
+      "id": "michelada_soda",
+      "nombre": "Michelada con soda",
+      "categoria": "micheladas",
+      "precio": 9500,
+      "descripcion": "Michelada de frutas acompañada con soda.",
+      "selecciones": [{ "grupo": "sabores_michelada", "cantidad": 1 }]
+    },
+    {
+      "id": "michelada_ginger",
+      "nombre": "Michelada con ginger",
+      "categoria": "micheladas",
+      "precio": 10500,
+      "descripcion": "Michelada de frutas acompañada con ginger.",
+      "selecciones": [{ "grupo": "sabores_michelada", "cantidad": 1 }]
+    },
+    {
+      "id": "michelada_cerveza",
+      "nombre": "Michelada con cerveza",
+      "categoria": "micheladas",
+      "precio": 12500,
+      "descripcion": "Michelada de frutas acompañada con cerveza.",
+      "selecciones": [{ "grupo": "sabores_michelada", "cantidad": 1 }]
+    },
+    { "id": "granizado_maracuya", "nombre": "Granizado de maracuyá", "categoria": "granizados", "precio": 8000, "selecciones": [] },
+    { "id": "granizado_lulo", "nombre": "Granizado de lulo", "categoria": "granizados", "precio": 8000, "selecciones": [] },
+    { "id": "granizado_mora", "nombre": "Granizado de mora", "categoria": "granizados", "precio": 8000, "selecciones": [] },
+    { "id": "granizado_limon", "nombre": "Granizado de limón", "categoria": "granizados", "precio": 8000, "selecciones": [] },
+    { "id": "granizado_mango_viche", "nombre": "Granizado de mango viche", "categoria": "granizados", "precio": 8000, "selecciones": [] },
+    { "id": "granizado_cafe", "nombre": "Granizado de café", "categoria": "granizados", "precio": 10000, "selecciones": [] },
+    { "id": "limonada_coco", "nombre": "Limonada de coco", "categoria": "granizados", "precio": 10000, "selecciones": [] },
+    { "id": "limonada_cerezada", "nombre": "Limonada cerezada", "categoria": "granizados", "precio": 10000, "selecciones": [] },
+    {
+      "id": "infantil",
+      "nombre": "Helado infantil",
+      "categoria": "infantiles",
+      "precio": 6000,
+      "descripcion": "Helado con figura: búho, araña, payaso o ratón.",
+      "selecciones": [{ "grupo": "figuras_infantil", "cantidad": 1 }]
+    },
+    { "id": "cono_1", "nombre": "Cono 1 bola", "categoria": "conos", "precio": 3500, "selecciones": [{ "grupo": "sabores", "cantidad": 1 }] },
+    { "id": "cono_2", "nombre": "Cono 2 bolas", "categoria": "conos", "precio": 6500, "selecciones": [{ "grupo": "sabores", "cantidad": 2 }] },
+    { "id": "estrella_1", "nombre": "Estrella 1 bola", "categoria": "conos", "precio": 4500, "selecciones": [{ "grupo": "sabores", "cantidad": 1 }] },
+    { "id": "estrella_2", "nombre": "Estrella 2 bolas", "categoria": "conos", "precio": 9000, "selecciones": [{ "grupo": "sabores", "cantidad": 2 }] },
+    { "id": "estrella_3", "nombre": "Estrella 3 bolas", "categoria": "conos", "precio": 10000, "selecciones": [{ "grupo": "sabores", "cantidad": 3 }] }
+  ],
+  "adicionales": [
+    { "id": "topping_extra", "nombre": "Topping adicional", "precio": 1700, "grupo": "toppings_waffle" },
+    { "id": "fruta_extra", "nombre": "Fruta adicional", "precio": 1800, "grupo": "frutas_waffle" },
+    { "id": "chantilly_extra", "nombre": "Chantilly adicional", "precio": 3000 },
+    { "id": "queso_extra", "nombre": "Queso adicional", "precio": 3000 },
+    { "id": "bola_extra", "nombre": "Bola de helado adicional", "precio": 3000, "grupo": "sabores" }
+  ],
+  "medios_pago": [
+    { "id": "nequi", "nombre": "Nequi", "cuenta": "300 000 0000", "titular": "Heladería Demo", "requiere_comprobante": true },
+    { "id": "daviplata", "nombre": "Daviplata", "cuenta": "300 000 0000", "titular": "Heladería Demo", "requiere_comprobante": true },
+    { "id": "bancolombia", "nombre": "Bancolombia (ahorros)", "cuenta": "000-000000-00", "titular": "Heladería Demo", "requiere_comprobante": true },
+    { "id": "davivienda", "nombre": "Davivienda", "cuenta": "000000000000", "titular": "Heladería Demo", "requiere_comprobante": true },
+    { "id": "datafono", "nombre": "Datáfono (al entregar)", "requiere_comprobante": false },
+    { "id": "efectivo", "nombre": "Efectivo (al entregar)", "requiere_comprobante": false }
+  ]
+}

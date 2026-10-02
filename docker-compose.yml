@@ -1,0 +1,32 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: heladeria
+      POSTGRES_PASSWORD: heladeria
+      POSTGRES_DB: heladeria
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U heladeria"]
+      interval: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://heladeria:heladeria@db:5432/heladeria
+      SEED_FILE: /seeds/demo.json
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./seeds:/seeds:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:

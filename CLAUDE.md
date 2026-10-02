@@ -1,0 +1,74 @@
+# Heladería Bot — contexto para Claude Code
+
+Chatbot de pedidos por WhatsApp para una heladería de Cali que hoy atiende manualmente.
+Proyecto de portafolio de Esteban (dev full stack junior: Vue, FastAPI, PostgreSQL, Docker).
+La planeación completa y todas las decisiones están en `PLANEACION.md` — léela antes de cambios grandes.
+
+## Forma de trabajo
+
+- Responde en **español**, estilo directo, **paso a paso**: una fase o tarea a la vez, y muestra qué cambió.
+- Corre lint y tests antes de dar algo por terminado.
+- Al terminar una tarea, márcala `[x]` en la sección 11 de `PLANEACION.md`.
+- Entorno: **Windows**. Usa PowerShell o Git Bash; rutas con cuidado.
+
+## Reglas del proyecto (no negociables)
+
+1. **"La IA interpreta, el código decide"**: el LLM solo convierte texto libre → JSON con IDs del menú. Validación, reglas, adicionales y precios los calcula el código. Nunca precios desde la IA.
+2. **Todo configurable por `.env`** (ver `.env.example` y `backend/app/config.py`). Nada de credenciales en el código.
+3. **IA intercambiable** detrás de una interfaz (`IA_PROVIDER`: gemini | groq | ollama | openai | anthropic). Demo con capa gratis.
+4. **Canales como adaptadores** (WhatsApp Cloud API oficial + chat web) sobre un mismo motor de conversación.
+5. **Pagos detrás de `ProveedorPago`**. MVP = nivel 1 (manual): el bot envía cuenta + monto, reenvía el comprobante al personal y este confirma con botón.
+6. **Demo con datos ficticios**: "Heladería Demo" y cuentas falsas. Nunca poner números de cuenta reales en `seeds/demo.json` (hay un test que lo verifica). Datos reales irían en `seeds/heladeria.json` (en .gitignore).
+7. Solo **WhatsApp Cloud API oficial** (nada de whatsapp-web.js/Baileys).
+8. Proyecto **migrable**: Docker, PostgreSQL estándar + Alembic, nada exclusivo de un proveedor.
+
+## Stack
+
+- Backend: Python 3.12, FastAPI, SQLAlchemy 2, Alembic, Pydantic 2, pydantic-settings, httpx, pytest, ruff. Gestor: **uv**.
+- BD: PostgreSQL 16 (Docker).
+- Frontend (Fase 2): Vue 3 + Vite + TypeScript, Pinia, Vue Router, Tailwind.
+- Despliegue demo: Render (backend), Neon (BD), Vercel (frontend).
+
+## Estructura
+
+```
+backend/app/config.py        configuración desde .env
+backend/app/main.py          endpoints (/health, /menu)
+backend/app/menu/schema.py   modelos Pydantic + validación del menú semilla
+backend/tests/               pytest
+seeds/demo.json              menú completo (26 productos, 11 sabores, adicionales, medios de pago ficticios)
+docker-compose.yml           db (postgres) + backend
+```
+
+## Comandos
+
+```bash
+# desde backend/
+uv sync
+uv run pytest
+uv run ruff check . && uv run ruff format --check .
+uv run uvicorn app.main:app --reload        # http://localhost:8000/docs
+
+# desde la raíz
+docker compose up -d db                     # solo la BD
+docker compose up --build                   # todo
+```
+
+## Dominio del menú (resumen)
+
+- Productos con `selecciones`: cada una es un grupo de opciones + cantidad (ej. copa queso = 2 sabores + 1 salsa + 1 topping; banana split = 3 sabores + 1 salsa + 1 topping). Los sabores **pueden repetirse**.
+- Las listas de salsas/toppings **varían por producto** (`salsas_waffle`, `salsas_base`, `salsas_generales`, etc.).
+- Adicionales con precio fijo; algunos exigen elegir del grupo (ej. topping adicional → qué topping).
+- Caso de prueba real: copa queso (brownie, fresa · frutos rojos · maní) + banana split (brownie, vainilla chips, brownie · frutos rojos · oreo) = **$24.000**.
+- `_pendientes` en `demo.json` lista lo que falta confirmar con la heladería.
+
+## Estado actual
+
+- ✅ Fase 0: estructura del repo, menú semilla validado, 5 tests pasando.
+- ⏭️ **Siguiente: Fase 1 — Núcleo (sin WhatsApp)**, en este orden:
+  1. Modelos SQLAlchemy + migraciones Alembic (sección 8 de `PLANEACION.md`).
+  2. Carga del archivo semilla a la BD.
+  3. Carrito y reglas: validar selecciones por producto, adicionales y total. Tests con el caso real de $24.000.
+  4. Servicio de IA (interfaz + 1 proveedor) → texto a JSON validado.
+  5. Motor de conversación (máquina de estados, sección 7).
+  6. Endpoint `/chat` de prueba + tests con los mensajes del chat real.
