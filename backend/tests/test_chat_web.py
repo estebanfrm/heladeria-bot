@@ -4,9 +4,9 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 
-from app.canales.web import get_proveedor
 from app.config import settings
 from app.db import get_db
+from app.dependencias import get_proveedor
 from app.enums import Canal, EstadoPedido, TipoEntrega
 from app.ia.casos import CASOS
 from app.ia.interpretacion import Intencion, Interpretacion

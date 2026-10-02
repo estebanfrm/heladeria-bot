@@ -1,12 +1,10 @@
 """Canal: chat web (lo usará el widget Vue de la Fase 2; hoy se prueba desde /docs).
 
-Adaptador delgado sobre el motor, igual que será el de WhatsApp: valida la entrada,
+Adaptador delgado sobre el motor, igual que el de WhatsApp: valida la entrada,
 aplica el límite del demo público y delega todo lo demás en `Motor`.
 """
 
-import logging
 import uuid
-from functools import lru_cache
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -18,11 +16,11 @@ from app.config import settings
 from app.conversacion.mensajes import Respuesta
 from app.conversacion.motor import Entrada, Motor
 from app.db import get_db
+from app.dependencias import get_proveedor
 from app.enums import Canal, OrigenMensaje
-from app.ia.proveedores import ProveedorIA, ProveedorNoConfigurado, crear_proveedor
+from app.ia.proveedores import ProveedorIA
 from app.models import Conversacion, Mensaje
 
-logger = logging.getLogger(__name__)
 router = APIRouter(tags=["chat web"])
 
 
@@ -45,16 +43,6 @@ class MensajeChat(BaseModel):
 class RespuestaChat(BaseModel):
     sesion: str
     respuestas: list[Respuesta]
-
-
-@lru_cache
-def get_proveedor() -> ProveedorIA:
-    """Proveedor de IA según .env (uno por proceso, reutiliza la conexión HTTP)."""
-    try:
-        return crear_proveedor(settings)
-    except ValueError as e:
-        logger.warning("IA no configurada (%s): solo funcionarán los botones", e)
-        return ProveedorNoConfigurado(str(e))
 
 
 @router.post("/chat")

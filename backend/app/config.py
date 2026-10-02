@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     wa_access_token: str = ""
     wa_verify_token: str = ""
     wa_app_secret: str = ""
+    wa_api_version: str = "v26.0"  # versión de la Graph API de Meta
     staff_phones: str = ""  # números del personal separados por coma
 
     # IA

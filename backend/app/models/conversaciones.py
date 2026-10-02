@@ -63,6 +63,9 @@ class Mensaje(Base):
         ForeignKey("conversacion.id", ondelete="CASCADE"), index=True
     )
     origen: Mapped[OrigenMensaje] = mapped_column(enum_texto(OrigenMensaje))
+    # Id del mensaje en el canal (wamid de WhatsApp): Meta reintenta webhooks y no deben
+    # procesarse dos veces
+    id_externo: Mapped[str | None] = mapped_column(unique=True)
     texto: Mapped[str | None]
     media_url: Mapped[str | None]  # ej. imagen del comprobante
     creado: Mapped[datetime] = mapped_column(server_default=func.now())

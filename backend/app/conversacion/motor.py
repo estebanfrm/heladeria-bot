@@ -48,6 +48,7 @@ class Entrada:
     boton: str | None = None  # id de un botón (ej. "confirmar", "pago:nequi")
     media_url: str | None = None  # imagen, ej. el comprobante
     nombre: str | None = None  # nombre de perfil, si el canal lo da
+    id_mensaje: str | None = None  # id del mensaje en el canal (ej. wamid de WhatsApp)
 
 
 class Motor:
@@ -62,6 +63,7 @@ class Motor:
             OrigenMensaje.CLIENTE,
             entrada.texto or (f"[{entrada.boton}]" if entrada.boton else None),
             entrada.media_url,
+            entrada.id_mensaje,
         )
         if conv.modo is ModoConversacion.HUMANO:
             respuestas = []  # la atiende una persona (panel, Fase 3)
@@ -286,9 +288,22 @@ class Motor:
         return conv
 
     def _guardar(
-        self, conv: Conversacion, origen: OrigenMensaje, texto: str | None, media: str | None = None
+        self,
+        conv: Conversacion,
+        origen: OrigenMensaje,
+        texto: str | None,
+        media: str | None = None,
+        id_externo: str | None = None,
     ) -> None:
-        self.session.add(Mensaje(conversacion=conv, origen=origen, texto=texto, media_url=media))
+        self.session.add(
+            Mensaje(
+                conversacion=conv,
+                origen=origen,
+                texto=texto,
+                media_url=media,
+                id_externo=id_externo,
+            )
+        )
 
     @staticmethod
     def _carrito(conv: Conversacion) -> list[ItemSolicitado]:
