@@ -209,3 +209,54 @@ def test_flujo_real_texto_a_24000(menu_demo):
     final = validar_carrito(menu_demo, segundo.items)
     assert final.completo and final.total == 24000
     assert segundo.items == PEDIDO_COMPLETO
+
+
+# --- Robustez (hallazgos de la prueba real con Ollama) -------------------------------
+
+
+def test_respuesta_cortada_por_limite_de_tokens():
+    """Ollama cortó el JSON a la mitad: debe reportarse como corte, no como "JSON inválido"."""
+    respuesta = httpx.Response(
+        200,
+        json={
+            "choices": [{"finish_reason": "length", "message": {"content": '{"intencion": "ped'}}]
+        },
+    )
+    with pytest.raises(ErrorIA, match="se cortó por el límite de tokens"):
+        _proveedor(lambda _req: respuesta).completar_json("s", "u")
+
+
+def test_el_error_de_validacion_dice_donde_falla():
+    texto = '{"intencion": "pedido", "items": [{"producto": "x", "opciones": {"salsita": ["y"]}}]}'
+    with pytest.raises(RespuestaIAInvalida, match=r"en items\.0\.opciones\.salsita"):
+        leer_respuesta(texto)
+
+
+def test_el_prompt_pide_json_compacto(menu_demo):
+    sistema, _ = construir_prompt(menu_demo, "hola", [], EstadoConversacion.INICIO)
+    assert "JSON COMPACTO" in sistema
+    # El ejemplo compacto (sin campos por defecto) es válido para el sistema
+    ejemplo = next(linea for linea in sistema.splitlines() if linea.startswith('{"intencion"'))
+    assert [i.producto for i in leer_respuesta(ejemplo).items] == ["copa_queso", "banana_split"]
+
+
+@pytest.mark.parametrize(("esfuerzo", "esperado"), [("", None), ("none", "none")])
+def test_reasoning_effort_solo_se_envia_si_se_configura(esfuerzo, esperado):
+    recibido = {}
+
+    def manejador(request: httpx.Request) -> httpx.Response:
+        recibido.update(json.loads(request.content))
+        return httpx.Response(200, json={"choices": [{"message": {"content": "{}"}}]})
+
+    cliente = httpx.Client(
+        base_url="http://ollama.test/v1", transport=httpx.MockTransport(manejador)
+    )
+    ProveedorCompatibleOpenAI("x", "m", reasoning_effort=esfuerzo, cliente=cliente).completar_json(
+        "s", "u"
+    )
+    assert recibido.get("reasoning_effort") == esperado
+
+
+def test_crear_proveedor_pasa_el_reasoning_effort():
+    creado = crear_proveedor(_config(ia_provider="groq", ia_reasoning_effort="none"))
+    assert creado.reasoning_effort == "none"

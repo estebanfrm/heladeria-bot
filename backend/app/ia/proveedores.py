@@ -36,9 +36,11 @@ class ProveedorCompatibleOpenAI:
         modelo: str,
         api_key: str = "",
         timeout: float = 20.0,
+        reasoning_effort: str = "",
         cliente: httpx.Client | None = None,  # inyectable en tests
     ):
         self.modelo = modelo
+        self.reasoning_effort = reasoning_effort
         self._cliente = cliente or httpx.Client(
             base_url=base_url,
             timeout=timeout,
@@ -55,10 +57,13 @@ class ProveedorCompatibleOpenAI:
             "temperature": 0,
             "response_format": {"type": "json_object"},
         }
+        if self.reasoning_effort:
+            cuerpo["reasoning_effort"] = self.reasoning_effort
         try:
             respuesta = self._cliente.post("chat/completions", json=cuerpo)
             respuesta.raise_for_status()
-            contenido = respuesta.json()["choices"][0]["message"]["content"]
+            eleccion = respuesta.json()["choices"][0]
+            contenido = eleccion["message"]["content"]
         except httpx.HTTPStatusError as e:
             codigo = e.response.status_code
             raise ErrorIA(f"El proveedor de IA respondió {codigo}: {e.response.text[:200]}") from e
@@ -66,6 +71,11 @@ class ProveedorCompatibleOpenAI:
             raise ErrorIA(f"No se pudo contactar al proveedor de IA: {e!r}") from e
         except (KeyError, IndexError, TypeError, ValueError) as e:
             raise ErrorIA("Respuesta del proveedor de IA con formato inesperado") from e
+        if eleccion.get("finish_reason") == "length":
+            raise ErrorIA(
+                "La respuesta de la IA se cortó por el límite de tokens "
+                "(en Ollama: aumentar el contexto del modelo)"
+            )
         if not isinstance(contenido, str):
             raise ErrorIA("El proveedor de IA no devolvió texto")
         return contenido
@@ -111,5 +121,9 @@ def crear_proveedor(config: Settings) -> ProveedorIA:
     if not config.ia_api_key and nombre != "ollama" and not config.ia_base_url:
         raise ValueError(f"Falta IA_API_KEY en .env para '{nombre}'.")
     return ProveedorCompatibleOpenAI(
-        base_url, config.ia_model, config.ia_api_key, config.ia_timeout
+        base_url,
+        config.ia_model,
+        config.ia_api_key,
+        config.ia_timeout,
+        reasoning_effort=config.ia_reasoning_effort,
     )

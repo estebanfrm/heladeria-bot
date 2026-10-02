@@ -62,8 +62,16 @@ Con el backend arriba, abre http://localhost:8000/docs y usa `POST /chat`:
 ```
 
 La respuesta trae una `sesion`; mándala en los siguientes mensajes para seguir la misma conversación.
-Los botones se envían como `{"sesion": "...", "boton": "confirmar"}`. Para el texto libre hace falta
-`IA_API_KEY` (Gemini) en `.env`; sin ella `/health` muestra `"ia": "no configurada"` y solo responden los botones.
+Los botones se envían como `{"sesion": "...", "boton": "confirmar"}`. Para el texto libre hace falta una IA
+configurada en `.env`: Gemini (`IA_API_KEY`) o, en local y gratis, Ollama:
+
+```env
+IA_PROVIDER=ollama
+IA_MODEL=gemma4:12b
+IA_REASONING_EFFORT=none   # sin esto el modelo "razona" y tarda ~2 min por mensaje
+```
+
+Sin IA, `/health` muestra `"ia": "no configurada"` y solo responden los botones.
 
 ## Pruebas
 

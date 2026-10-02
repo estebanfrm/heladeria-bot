@@ -96,6 +96,7 @@ docker build -f backend/Dockerfile .        # solo la imagen, como en Render (co
   3. ✅ Carrito y reglas (`app/pedidos/carrito.py`): caso real de $24.000.
   4. ✅ Servicio de IA (`app/ia/`): gemini | groq | ollama | openai vía API compatible con OpenAI;
      anthropic pendiente. IA del demo: Gemini `gemini-3.5-flash-lite` (falta la API key de Esteban).
+     Desarrollo local: Ollama `gemma4:12b` + `IA_REASONING_EFFORT=none` (8/8 casos, 1–9 s).
   5. ✅ Motor de conversación (`app/conversacion/`).
   6. ✅ Endpoint `POST /chat` (canal web). 95 tests.
 - ⏭️ **Siguiente: Fase 2 — Canales** (sección 11 de `PLANEACION.md`), empezando por el chat web
