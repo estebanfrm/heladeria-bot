@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from app.enums import TipoGrupo
 from app.menu.schema import Menu, cargar_menu
 
 SEED_DEMO = Path(__file__).resolve().parents[2] / "seeds" / "demo.json"
@@ -19,6 +20,15 @@ def test_seed_demo_es_valido(menu):
 
 def test_once_sabores(menu):
     assert len(menu.grupo("sabores").opciones) == 11
+
+
+def test_grupos_tienen_tipo(menu):
+    tipos = {g.id: g.tipo for g in menu.grupos_opciones}
+    assert tipos["sabores"] is TipoGrupo.SABOR
+    assert {tipos[g] for g in ("salsas_waffle", "salsas_base", "salsas_generales")} == {
+        TipoGrupo.SALSA
+    }
+    assert tipos["figuras_infantil"] is TipoGrupo.VARIANTE
 
 
 def test_reglas_del_chat_real(menu):

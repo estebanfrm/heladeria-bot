@@ -38,15 +38,18 @@ docker compose up --build
 # → http://localhost:8000/health y http://localhost:8000/docs
 
 # Opción B: backend local con uv (BD en Docker)
+# (si ya tienes otro Postgres en el 5432, cambia DB_PORT y DATABASE_URL en .env)
 docker compose up -d db
 cd backend
 uv sync
+uv run alembic upgrade head
 uv run uvicorn app.main:app --reload
 ```
 
 ## Pruebas
 
 ```bash
+docker compose up -d db   # los tests de modelos/migraciones usan Postgres real (BD heladeria_test)
 cd backend
 uv run pytest
 uv run ruff check .

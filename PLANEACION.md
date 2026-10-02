@@ -50,7 +50,7 @@ Análisis de un chat real exportado (28/09/2026):
 | 7:56 | Cliente | Brownie, vainilla chips, brownie · frutos rojos · oreo |
 | 7:56 | Heladería | ¿Y para la copa queso qué salsa y topping? |
 | 7:57 | Heladería | Serían $24.000 · ¿Con cuánto cancela? · Dirección |
-| 7:58 | Cliente | Por Nequi, me mandas el número · Cra 40 #96a18 |
+| 7:58 | Cliente | Por Nequi, me mandas el número · Calle Falsa #12-34 |
 | 7:58 | Heladería | Con gusto, ya se te prepara |
 | 8:03 | Cliente | *(imagen — comprobante)* |
 | 8:14 | Heladería | Ya salió tu pedido |
@@ -322,7 +322,7 @@ INICIO
 > **Total: $24.000** *[Confirmar]* *[Agregar algo]* *[Cambiar]*
 > **Cliente:** *[Confirmar]*
 > **Bot:** ¿A qué dirección lo enviamos y cómo pagas? *[Nequi]* *[Daviplata]* *[Bancolombia]* *[Efectivo]*
-> **Cliente:** Cra 40 #96a18, Nequi
+> **Cliente:** Calle Falsa #12-34, Nequi
 > **Bot:** Envía $24.000 al Nequi **300 000 0000** a nombre de Heladería Demo y mándame el comprobante 📸
 > **Cliente:** *(imagen)*
 > **Bot:** ¡Recibido! En cuanto confirmemos el pago empezamos a preparar tu pedido ✅
@@ -337,7 +337,7 @@ Cada pedido confirmado se envía por WhatsApp a los números del personal (confi
 ```
 🍦 PEDIDO #0042 — 7:57 p. m.
 👤 Laura · 300 123 4567
-📍 Cra 40 #96a18
+📍 Calle Falsa #12-34
 💳 Nequi — comprobante adjunto ⬇️
 
 1× Copa queso — $12.000
@@ -416,28 +416,49 @@ Resultado en el mensaje al personal:
 
 ## 8. Modelo de datos
 
-```
-producto           (id, nombre, categoria, precio, descripcion, activo,
-                    num_sabores, num_salsas, num_toppings, num_frutas)
-grupo_opcion       (id, tipo: sabor|salsa|topping|fruta|variante, nombre)
-opcion             (id, grupo_id, nombre, disponible)
-producto_grupo     (producto_id, grupo_id, cantidad)   -- qué listas aplica a cada producto
-adicional          (id, nombre, precio)
-medio_pago         (id, nombre, numero_cuenta, titular, activo)
+Implementado en `backend/app/models/` + migración `0001_esquema_inicial` (Alembic).
 
-cliente            (id, telefono, nombre, ultima_direccion, acepto_datos, creado)
-conversacion       (id, cliente_id, canal: whatsapp|web, estado, contexto_json,
-                    modo: bot|humano, actualizado)
+```
+negocio            (id, nombre, moneda, ciudad, horario, costo_domicilio, nota_domicilio)  -- 1 fila
+categoria          (id, codigo, nombre, orden)
+grupo_opcion       (id, codigo, tipo: sabor|salsa|topping|fruta|variante, nombre)
+opcion             (id, grupo_id, codigo, nombre, disponible)      -- único (grupo_id, codigo)
+producto           (id, codigo, nombre, categoria_id, precio, descripcion, activo)
+producto_seleccion (producto_id, grupo_id, cantidad, permite_repetir, orden)  -- qué elige el cliente
+adicional          (id, codigo, nombre, precio, grupo_id?, activo)  -- grupo_id: elegir cuál (ej. topping)
+medio_pago         (id, codigo, nombre, numero_cuenta?, titular?, requiere_comprobante, activo)
+
+cliente            (id, telefono?, nombre, ultima_direccion, acepto_datos_en, creado)
+conversacion       (id, cliente_id, canal: whatsapp|web, id_externo, estado, modo: bot|humano,
+                    contexto_json, creado, actualizado)            -- único (canal, id_externo)
 mensaje            (id, conversacion_id, origen: cliente|bot|humano, texto, media_url, creado)
 
-pedido             (id, cliente_id, conversacion_id, estado, subtotal, domicilio, total,
-                    direccion, medio_pago_id, comprobante_url, creado)
-item_pedido        (id, pedido_id, producto_id, cantidad, precio_unitario, notas)
-item_opcion        (item_id, opcion_id)
-item_adicional     (item_id, adicional_id, cantidad, precio)
+pedido             (id, cliente_id, conversacion_id, estado, tipo_entrega: domicilio|recoger,
+                    subtotal, domicilio, total, direccion, medio_pago_id, comprobante_url,
+                    creado, actualizado)                           -- CHECK total = subtotal + domicilio
+item_pedido        (id, pedido_id, producto_id, nombre, cantidad, precio_unitario, notas)
+item_opcion        (id, item_id, opcion_id, nombre, posicion)      -- único (item_id, posicion)
+item_adicional     (id, item_id, adicional_id, opcion_id?, nombre, cantidad, precio_unitario)
 ```
 
 Estados del pedido: `BORRADOR → PENDIENTE_PAGO → PAGO_VERIFICADO → EN_PREPARACION → ENVIADO → ENTREGADO` (+ `CANCELADO`).
+Estados de la conversación: los de la sección 7 (+ `CANCELADA` por inactividad); `HUMANO` es el campo `modo`.
+
+**Decisiones del modelo:**
+
+- PK entera + `codigo` estable (el `id` del seed, ej. `copa_queso`): la IA trabaja con códigos y el panel puede renombrar sin romper relaciones.
+- `producto_seleccion` reemplaza las columnas `num_sabores/num_salsas/…`: una sola fuente para las reglas, igual que en el seed.
+- `opcion` es única **por grupo**: `frutos_rojos` es salsa en 3 grupos y sabor de michelada; `fresa` es sabor, salsa y fruta. Con `tipo` + `codigo` el panel puede marcar agotada "salsa frutos rojos" en todos sus grupos.
+- `item_opcion` tiene id propio y `posicion` para permitir sabores repetidos (brownie, vainilla chips, brownie).
+- Nombres y precios se **copian** en el pedido: si cambia el menú, los pedidos viejos no cambian.
+- Dinero en `Integer` (pesos COP). Enums como `VARCHAR(30)` validados por SQLAlchemy (sin `ENUM` de Postgres ni `CHECK`): agregar un valor no requiere migración.
+- Composición con `ON DELETE CASCADE` (opciones de un grupo, ítems de un pedido, mensajes); el catálogo usado en pedidos no se puede borrar → se desactiva (`activo`/`disponible`).
+
+**Pendiente de modelar en su fase (cada uno con su migración):**
+
+- Fase 2: alerta "❌ Pago no llega" y marcas de recordatorio 15/60 min en `pedido` (7.1, 7.2); `mensaje.id_externo` único para no procesar dos veces el mismo webhook de WhatsApp; tabla `personal` (números + ventana de 24 h / "turno") cuando deje de bastar `STAFF_PHONES` en `.env`.
+- Al confirmar con la heladería: tiempo estimado de entrega en `negocio`, zonas de domicilio.
+- Fuera del MVP: referencia de comprobante única (pago nivel 2), referencia de pasarela (nivel 3).
 
 ---
 
@@ -495,6 +516,7 @@ APP_BASE_URL=http://localhost:8000
 SEED_FILE=seeds/demo.json
 
 # Base de datos
+DB_PORT=5432              # puerto del host para el Postgres de docker-compose
 DATABASE_URL=postgresql+psycopg://user:pass@localhost:5432/heladeria
 
 # WhatsApp Cloud API
@@ -541,12 +563,12 @@ WEB_CHAT_MAX_MSGS_PER_SESSION=20
 - [x] Analizar chat real y menú
 - [x] Definir arquitectura, costos y estrategia
 - [x] Lista de sabores de helado (11 sabores)
-- [ ] Crear repositorio en GitHub (`estebanfrm/heladeria-bot` o similar)
+- [x] Crear repositorio en GitHub ([`estebanfrm/heladeria-bot`](https://github.com/estebanfrm/heladeria-bot))
 - [x] Estructura del repo, `docker-compose.yml`, `.env.example`
 - [x] `seeds/demo.json` con el menú estructurado + validación (`app/menu/schema.py` + test)
 
 ### Fase 1 — Núcleo (sin WhatsApp)
-- [ ] Modelos SQLAlchemy + migraciones Alembic
+- [x] Modelos SQLAlchemy + migraciones Alembic
 - [ ] Carga de semillas
 - [ ] Carrito y reglas: validación de opciones, adicionales, total
 - [ ] Servicio de IA (interfaz + 1 proveedor) → texto a JSON
@@ -617,7 +639,7 @@ WEB_CHAT_MAX_MSGS_PER_SESSION=20
 
 **Técnicos:**
 - [ ] Elegir proveedor de IA gratis para el demo (probar Gemini vs Groq con los casos reales)
-- [ ] Nombre del repositorio
+- [x] Nombre del repositorio (`heladeria-bot`)
 
 ---
 

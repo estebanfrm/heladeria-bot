@@ -8,6 +8,8 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field, PositiveInt, model_validator
 
+from app.enums import TipoGrupo
+
 
 class Opcion(BaseModel):
     id: str
@@ -17,6 +19,7 @@ class Opcion(BaseModel):
 
 class GrupoOpciones(BaseModel):
     id: str
+    tipo: TipoGrupo
     nombre: str
     opciones: list[Opcion] = Field(min_length=1)
 

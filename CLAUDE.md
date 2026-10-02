@@ -32,13 +32,20 @@ La planeación completa y todas las decisiones están en `PLANEACION.md` — lé
 ## Estructura
 
 ```
-backend/app/config.py        configuración desde .env
+backend/app/config.py        configuración desde .env (lee el .env de la raíz del repo)
 backend/app/main.py          endpoints (/health, /menu)
+backend/app/enums.py         valores cerrados del dominio (estados, canal, tipo de grupo…)
+backend/app/db.py            Base SQLAlchemy, engine, SessionLocal, get_db
+backend/app/models/          modelos de BD: menu.py, conversaciones.py, pedidos.py
 backend/app/menu/schema.py   modelos Pydantic + validación del menú semilla
-backend/tests/               pytest
+backend/migrations/          Alembic (env.py toma DATABASE_URL de settings)
+backend/tests/               pytest (conftest.py: BD heladeria_test en Postgres real)
 seeds/demo.json              menú completo (26 productos, 11 sabores, adicionales, medios de pago ficticios)
 docker-compose.yml           db (postgres) + backend
 ```
+
+**Ojo (equipo de Esteban):** hay un PostgreSQL 18 nativo de Windows ocupando el 5432. El `.env` local usa
+`DB_PORT=5433` y `DATABASE_URL=...@localhost:5433/...`. En CI y Docker todo sigue en 5432.
 
 ## Comandos
 
@@ -48,6 +55,8 @@ uv sync
 uv run pytest
 uv run ruff check . && uv run ruff format --check .
 uv run uvicorn app.main:app --reload        # http://localhost:8000/docs
+uv run alembic upgrade head                 # aplicar migraciones
+uv run alembic revision --autogenerate -m "describe el cambio"   # tras cambiar un modelo (revisar el archivo generado)
 
 # desde la raíz
 docker compose up -d db                     # solo la BD
@@ -64,10 +73,10 @@ docker compose up --build                   # todo
 
 ## Estado actual
 
-- ✅ Fase 0: estructura del repo, menú semilla validado, 5 tests pasando.
-- ⏭️ **Siguiente: Fase 1 — Núcleo (sin WhatsApp)**, en este orden:
-  1. Modelos SQLAlchemy + migraciones Alembic (sección 8 de `PLANEACION.md`).
-  2. Carga del archivo semilla a la BD.
+- ✅ Fase 0: estructura del repo, menú semilla validado. Repo: https://github.com/estebanfrm/heladeria-bot
+- 🔄 **Fase 1 — Núcleo (sin WhatsApp)**, en este orden:
+  1. ✅ Modelos SQLAlchemy + migración `0001` (sección 8 de `PLANEACION.md`), 12 tests pasando.
+  2. ⏭️ **Siguiente:** carga del archivo semilla a la BD.
   3. Carrito y reglas: validar selecciones por producto, adicionales y total. Tests con el caso real de $24.000.
   4. Servicio de IA (interfaz + 1 proveedor) → texto a JSON validado.
   5. Motor de conversación (máquina de estados, sección 7).

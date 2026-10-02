@@ -6,6 +6,21 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    services:
+      # Postgres para los tests de modelos y migraciones (mismas credenciales que docker-compose)
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: heladeria
+          POSTGRES_PASSWORD: heladeria
+          POSTGRES_DB: heladeria
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U heladeria"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
