@@ -42,13 +42,11 @@ Reglas:
 - "entrega": si da dirección, dice que recoge o elige medio de pago (código de MEDIOS DE PAGO).
 - "intencion": "humano" si pide un asesor o una persona; "confirmar" si acepta el resumen
   ("sí", "listo", "confirmo"); "cancelar" si ya no quiere el pedido; "ver_menu" si pide el menú.
+- JSON COMPACTO en una sola línea y sin campos por defecto: omite "cantidad" si es 1,
+  "adicionales" vacío, "notas" vacías, "opciones" vacías, "items" o "entrega" si son null.
 
 Ejemplo — carrito vacío, mensaje "Una copa queso, con brownie y fresa. Y un banana split":
-{"intencion": "pedido", "items": [
-  {"producto": "copa_queso", "cantidad": 1, "opciones": {"sabor": ["brownie", "fresa"]},
-   "adicionales": [], "notas": ""},
-  {"producto": "banana_split", "cantidad": 1, "opciones": {}, "adicionales": [], "notas": ""}
-], "entrega": null}
+{"intencion":"pedido","items":[{"producto":"copa_queso","opciones":{"sabor":["brownie","fresa"]}},{"producto":"banana_split"}]}
 """
 
 

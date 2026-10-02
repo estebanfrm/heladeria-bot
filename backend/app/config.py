@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     ia_api_key: str = ""
     ia_base_url: str = ""  # opcional: otra URL compatible con OpenAI (ej. Ollama desde Docker)
     ia_timeout: float = 20.0  # segundos
+    # Opcional: "none" apaga el razonamiento de modelos que piensan antes de responder
+    # (ej. gemma4 en Ollama: de 150 s a 17 s por mensaje). Vacío = lo que use el proveedor.
+    ia_reasoning_effort: str = ""
 
     # Límites
     web_chat_max_msgs_per_session: int = 20

@@ -5,6 +5,7 @@ texto con la IA), aplica las reglas con el carrito y decide la respuesta y el si
 La IA solo interpreta: precios, validaciones, estados y pedidos los decide este código.
 """
 
+import logging
 from dataclasses import dataclass
 
 from sqlalchemy import select
@@ -28,6 +29,8 @@ from app.menu.schema import Menu
 from app.models import Cliente, Conversacion, Mensaje, Pedido
 from app.pedidos.carrito import ItemSolicitado, validar_carrito
 from app.pedidos.servicio import crear_pedido
+
+logger = logging.getLogger(__name__)
 
 MAX_FALLOS = 2  # sin entender seguidos → pasa a una persona
 
@@ -81,7 +84,8 @@ class Motor:
 
         try:
             interp = interpretar(self.proveedor, menu, e.texto, self._carrito(conv), conv.estado)
-        except ErrorIA:
+        except ErrorIA as error:
+            logger.warning("La IA falló (conversación %s): %s", conv.id, error)
             return self._fallo(conv)
         if interp.intencion is Intencion.OTRO and interp.items is None and interp.entrega is None:
             return self._fallo(conv)

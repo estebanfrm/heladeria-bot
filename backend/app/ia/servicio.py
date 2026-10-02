@@ -38,4 +38,8 @@ def leer_respuesta(texto: str) -> Interpretacion:
     try:
         return Interpretacion.model_validate_json(texto[inicio : fin + 1])
     except ValidationError as e:
-        raise RespuestaIAInvalida(f"JSON de la IA inválido ({e.error_count()} errores)") from e
+        primero = e.errors()[0]
+        donde = ".".join(str(parte) for parte in primero["loc"]) or "raíz"
+        raise RespuestaIAInvalida(
+            f"JSON de la IA inválido en {donde}: {primero['msg']} ({e.error_count()} errores)"
+        ) from e
