@@ -1,0 +1,11 @@
+@import 'tailwindcss';
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  body {
+    @apply bg-linear-to-br from-rose-50 via-amber-50 to-stone-100 text-stone-900 antialiased;
+  }
+}

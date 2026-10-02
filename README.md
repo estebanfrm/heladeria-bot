@@ -51,6 +51,11 @@ uv sync
 uv run alembic upgrade head
 uv run python -m app.menu.carga     # carga seeds/demo.json en la BD
 uv run uvicorn app.main:app --reload
+
+# Chat web (otra terminal)
+cd frontend
+npm install
+npm run dev                          # http://localhost:5173
 ```
 
 ## Probar el bot

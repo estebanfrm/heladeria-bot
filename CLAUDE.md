@@ -26,7 +26,7 @@ La planeación completa y todas las decisiones están en `PLANEACION.md` — lé
 
 - Backend: Python 3.12, FastAPI, SQLAlchemy 2, Alembic, Pydantic 2, pydantic-settings, httpx, pytest, ruff. Gestor: **uv**.
 - BD: PostgreSQL 16 (Docker).
-- Frontend (Fase 2): Vue 3 + Vite + TypeScript, Pinia, Vue Router, Tailwind.
+- Frontend: Vue 3 + Vite + TypeScript, Pinia, Vue Router, Tailwind 4, Vitest. Gestor: **npm**. Node 22.18+ (24 LTS en CI).
 - Despliegue demo: Render (backend), Neon (BD), Vercel (frontend).
 
 ## Estructura
@@ -50,6 +50,8 @@ backend/app/pedidos/servicio.py  crear_pedido: carrito validado → Pedido con c
 backend/migrations/          Alembic (env.py toma DATABASE_URL de settings)
 backend/tests/               pytest (conftest.py: BD heladeria_test en Postgres real)
 seeds/demo.json              menú completo (26 productos, 11 sabores, adicionales, medios de pago ficticios)
+frontend/src/                api/chat.ts (cliente /chat), lib/formato.ts (negrita segura), stores/chat.ts,
+                             components/ChatWidget.vue, views/DemoView.vue (página del demo)
 docker-compose.yml           db (postgres) + backend (build con contexto = raíz del repo)
 .dockerignore                lista blanca: solo backend + seeds/demo.json entran a la imagen
 ```
@@ -77,6 +79,10 @@ uv run alembic revision --autogenerate -m "describe el cambio"   # tras cambiar 
 docker compose up -d db                     # solo la BD
 docker compose up --build                   # todo
 docker build -f backend/Dockerfile .        # solo la imagen, como en Render (contexto = raíz)
+
+# desde frontend/
+npm run dev                                 # http://localhost:5173 (backend en :8000)
+npx vitest run && npm run type-check && npx eslint . && npx prettier --check src/
 ```
 
 ## Dominio del menú (resumen)
@@ -99,5 +105,7 @@ docker build -f backend/Dockerfile .        # solo la imagen, como en Render (co
      Desarrollo local: Ollama `gemma4:12b` + `IA_REASONING_EFFORT=none` (8/8 casos, 1–9 s).
   5. ✅ Motor de conversación (`app/conversacion/`).
   6. ✅ Endpoint `POST /chat` (canal web). 95 tests.
-- ⏭️ **Siguiente: Fase 2 — Canales** (sección 11 de `PLANEACION.md`), empezando por el chat web
-  (widget Vue contra `/chat`) y luego WhatsApp Cloud API (webhook, botones, notificación al personal).
+- 🔄 **Fase 2 — Canales** (sección 11 de `PLANEACION.md`):
+  1. ✅ Chat web: `frontend/` (página de demo + widget) contra `/chat`; CORS por `CORS_ORIGINS`.
+  2. ⏭️ **Siguiente:** WhatsApp Cloud API. Esteban ya creó la cuenta de Meta for Developers; falta la app,
+     el número de prueba y el webhook (exponer local con Cloudflare Tunnel).

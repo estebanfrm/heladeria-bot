@@ -1,6 +1,7 @@
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -13,6 +14,12 @@ from app.menu.schema import Menu
 
 app = FastAPI(title="Heladería Bot", version="0.1.0")
 app.include_router(web.router)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origin_list,  # CORS_ORIGINS en .env
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
+)
 
 
 @app.exception_handler(MenuNoCargado)
