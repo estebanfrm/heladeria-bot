@@ -111,6 +111,9 @@ class Menu(BaseModel):
             for s in p.selecciones:
                 if s.grupo not in grupos:
                     errores.append(f"Producto '{p.id}': grupo '{s.grupo}' no existe")
+            usados = [s.grupo for s in p.selecciones]
+            if len(usados) != len(set(usados)):
+                errores.append(f"Producto '{p.id}': grupo repetido en selecciones")
         for a in self.adicionales:
             if a.grupo and a.grupo not in grupos:
                 errores.append(f"Adicional '{a.id}': grupo '{a.grupo}' no existe")

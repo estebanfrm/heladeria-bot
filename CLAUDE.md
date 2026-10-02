@@ -33,16 +33,21 @@ La planeación completa y todas las decisiones están en `PLANEACION.md` — lé
 
 ```
 backend/app/config.py        configuración desde .env (lee el .env de la raíz del repo)
-backend/app/main.py          endpoints (/health, /menu)
+backend/app/main.py          endpoints (/health, /menu desde la BD)
 backend/app/enums.py         valores cerrados del dominio (estados, canal, tipo de grupo…)
 backend/app/db.py            Base SQLAlchemy, engine, SessionLocal, get_db
 backend/app/models/          modelos de BD: menu.py, conversaciones.py, pedidos.py
 backend/app/menu/schema.py   modelos Pydantic + validación del menú semilla
+backend/app/menu/carga.py    seed → BD (sincroniza por codigo) y BD → Menu (carta vigente)
 backend/migrations/          Alembic (env.py toma DATABASE_URL de settings)
 backend/tests/               pytest (conftest.py: BD heladeria_test en Postgres real)
 seeds/demo.json              menú completo (26 productos, 11 sabores, adicionales, medios de pago ficticios)
-docker-compose.yml           db (postgres) + backend
+docker-compose.yml           db (postgres) + backend (build con contexto = raíz del repo)
+.dockerignore                lista blanca: solo backend + seeds/demo.json entran a la imagen
 ```
+
+Imagen Docker: replica el repo en `/app`; trae solo `seeds/demo.json`. Datos reales
+(`seeds/heladeria.json`) se montan como volumen y se eligen con `SEED_FILE` (relativo a la raíz del repo).
 
 **Ojo (equipo de Esteban):** hay un PostgreSQL 18 nativo de Windows ocupando el 5432. El `.env` local usa
 `DB_PORT=5433` y `DATABASE_URL=...@localhost:5433/...`. En CI y Docker todo sigue en 5432.
@@ -56,11 +61,13 @@ uv run pytest
 uv run ruff check . && uv run ruff format --check .
 uv run uvicorn app.main:app --reload        # http://localhost:8000/docs
 uv run alembic upgrade head                 # aplicar migraciones
+uv run python -m app.menu.carga             # aplicar SEED_FILE a la BD (--auto: solo si hay versión nueva)
 uv run alembic revision --autogenerate -m "describe el cambio"   # tras cambiar un modelo (revisar el archivo generado)
 
 # desde la raíz
 docker compose up -d db                     # solo la BD
 docker compose up --build                   # todo
+docker build -f backend/Dockerfile .        # solo la imagen, como en Render (contexto = raíz)
 ```
 
 ## Dominio del menú (resumen)
@@ -75,9 +82,9 @@ docker compose up --build                   # todo
 
 - ✅ Fase 0: estructura del repo, menú semilla validado. Repo: https://github.com/estebanfrm/heladeria-bot
 - 🔄 **Fase 1 — Núcleo (sin WhatsApp)**, en este orden:
-  1. ✅ Modelos SQLAlchemy + migración `0001` (sección 8 de `PLANEACION.md`), 12 tests pasando.
-  2. ⏭️ **Siguiente:** carga del archivo semilla a la BD.
-  3. Carrito y reglas: validar selecciones por producto, adicionales y total. Tests con el caso real de $24.000.
+  1. ✅ Modelos SQLAlchemy + migraciones `0001`–`0002` (sección 8 de `PLANEACION.md`).
+  2. ✅ Carga del seed a la BD; `/menu` lee de Postgres. 20 tests pasando.
+  3. ⏭️ **Siguiente:** carrito y reglas: validar selecciones por producto, adicionales y total. Tests con el caso real de $24.000.
   4. Servicio de IA (interfaz + 1 proveedor) → texto a JSON validado.
   5. Motor de conversación (máquina de estados, sección 7).
   6. Endpoint `/chat` de prueba + tests con los mensajes del chat real.

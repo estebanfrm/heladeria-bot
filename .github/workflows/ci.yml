@@ -28,3 +28,16 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run pytest -q
+
+  docker:
+    # La imagen se construye igual que en Render (contexto = raíz del repo, sin volúmenes)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f backend/Dockerfile -t heladeria-backend .
+      - name: La imagen trae el seed demo válido
+        run: >-
+          docker run --rm heladeria-backend python -c "from app.config import settings;
+          from app.menu.schema import cargar_menu; print(cargar_menu(settings.seed_file).negocio.nombre)"
+      - name: La imagen no trae datos reales ni secretos
+        run: docker run --rm heladeria-backend sh -c 'test ! -e /app/seeds/heladeria.json && test ! -e /app/.env'

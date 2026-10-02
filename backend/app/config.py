@@ -2,19 +2,24 @@
 
 from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# .env en la raíz del repo, sin importar desde qué carpeta se ejecute (uvicorn, alembic, pytest)
-ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
+# Raíz del repo (en la imagen Docker es /app, que replica la misma estructura).
+# Así .env y SEED_FILE funcionan igual sin importar desde qué carpeta se ejecute.
+RAIZ = Path(__file__).resolve().parents[2]
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=ENV_FILE, env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=RAIZ / ".env", env_file_encoding="utf-8", extra="ignore"
+    )
 
     # App
     app_env: str = "development"
     app_base_url: str = "http://localhost:8000"
-    seed_file: Path = Path("../seeds/demo.json")
+    # Relativo a la raíz del repo, o absoluto (ej. un archivo secreto montado en producción)
+    seed_file: Path = RAIZ / "seeds" / "demo.json"
 
     # Base de datos
     database_url: str = "postgresql+psycopg://heladeria:heladeria@localhost:5432/heladeria"
@@ -33,6 +38,11 @@ class Settings(BaseSettings):
 
     # Límites
     web_chat_max_msgs_per_session: int = 20
+
+    @field_validator("seed_file")
+    @classmethod
+    def _seed_relativo_a_la_raiz(cls, ruta: Path) -> Path:
+        return ruta if ruta.is_absolute() else RAIZ / ruta
 
     @property
     def staff_phone_list(self) -> list[str]:

@@ -416,13 +416,14 @@ Resultado en el mensaje al personal:
 
 ## 8. Modelo de datos
 
-Implementado en `backend/app/models/` + migración `0001_esquema_inicial` (Alembic).
+Implementado en `backend/app/models/` + migraciones Alembic `0001` (esquema inicial) y `0002` (versión del menú y `activo` en el catálogo).
 
 ```
-negocio            (id, nombre, moneda, ciudad, horario, costo_domicilio, nota_domicilio)  -- 1 fila
-categoria          (id, codigo, nombre, orden)
-grupo_opcion       (id, codigo, tipo: sabor|salsa|topping|fruta|variante, nombre)
-opcion             (id, grupo_id, codigo, nombre, disponible)      -- único (grupo_id, codigo)
+negocio            (id, nombre, moneda, ciudad, horario, costo_domicilio, nota_domicilio,
+                    version_menu)                                  -- 1 fila
+categoria          (id, codigo, nombre, orden, activo)
+grupo_opcion       (id, codigo, tipo: sabor|salsa|topping|fruta|variante, nombre, activo)
+opcion             (id, grupo_id, codigo, nombre, disponible, activo)  -- único (grupo_id, codigo)
 producto           (id, codigo, nombre, categoria_id, precio, descripcion, activo)
 producto_seleccion (producto_id, grupo_id, cantidad, permite_repetir, orden)  -- qué elige el cliente
 adicional          (id, codigo, nombre, precio, grupo_id?, activo)  -- grupo_id: elegir cuál (ej. topping)
@@ -452,7 +453,10 @@ Estados de la conversación: los de la sección 7 (+ `CANCELADA` por inactividad
 - `item_opcion` tiene id propio y `posicion` para permitir sabores repetidos (brownie, vainilla chips, brownie).
 - Nombres y precios se **copian** en el pedido: si cambia el menú, los pedidos viejos no cambian.
 - Dinero en `Integer` (pesos COP). Enums como `VARCHAR(30)` validados por SQLAlchemy (sin `ENUM` de Postgres ni `CHECK`): agregar un valor no requiere migración.
-- Composición con `ON DELETE CASCADE` (opciones de un grupo, ítems de un pedido, mensajes); el catálogo usado en pedidos no se puede borrar → se desactiva (`activo`/`disponible`).
+- Composición con `ON DELETE CASCADE` (opciones de un grupo, ítems de un pedido, mensajes); el catálogo usado en pedidos no se borra, se desactiva.
+- `activo` = sigue en la carta (lo controla el seed y luego el panel); `disponible` = no está agotado hoy (panel).
+
+**Carga del menú (`app/menu/carga.py`):** `uv run python -m app.menu.carga` sincroniza la BD con `SEED_FILE` por `codigo` (idempotente; lo que sale del seed queda `activo=False`). Aplicar el seed sobrescribe lo editado en el panel, por eso al arrancar el contenedor se usa `--auto`: solo carga si la BD no tiene menú o el seed trae una `version` mayor que `negocio.version_menu`. `/menu` lee la carta vigente desde la BD con el mismo esquema Pydantic del seed.
 
 **Pendiente de modelar en su fase (cada uno con su migración):**
 
@@ -542,7 +546,15 @@ WEB_CHAT_MAX_MSGS_PER_SESSION=20
 | Neon | `pg_dump` | PostgreSQL en el VPS |
 | Gemini gratis | `.env` | GPT-5.6 Luna |
 | Número de prueba de Meta | `.env` + Meta | Número de la heladería |
-| `seeds/demo.json` | `.env` | `seeds/heladeria.json` |
+| `seeds/demo.json` (dentro de la imagen) | `SEED_FILE` en `.env` + volumen | `seeds/heladeria.json` (montado, nunca en la imagen) |
+
+### Imagen Docker y menú semilla
+
+- El build usa la **raíz del repo** como contexto (`docker build -f backend/Dockerfile .`) y la imagen replica la estructura del repo en `/app` (`/app/backend`, `/app/seeds`).
+- `.dockerignore` es una **lista blanca**: solo entran el código del backend, las migraciones y `seeds/demo.json`. `.env` y `seeds/heladeria.json` nunca llegan a la imagen (lo verifica el CI).
+- **Demo (Render gratis, sin discos):** la imagen ya trae `demo.json`; no se configura nada. En Render: *Dockerfile Path* = `backend/Dockerfile`, *Docker Build Context* = raíz del repo.
+- **Producción (VPS con docker compose):** se copia `seeds/heladeria.json` al servidor (scp, fuera de git), se monta `./seeds:/app/seeds:ro` (ya está en `docker-compose.yml`) y `SEED_FILE=seeds/heladeria.json` en `.env`. Si se usara un PaaS pago, `SEED_FILE` acepta una ruta absoluta (ej. un archivo secreto montado).
+- Tras la primera carga, la BD es la fuente de verdad (el panel edita el menú); el seed solo se vuelve a aplicar si se sube su `version`.
 
 ### Pasos no técnicos de la migración
 
@@ -569,7 +581,7 @@ WEB_CHAT_MAX_MSGS_PER_SESSION=20
 
 ### Fase 1 — Núcleo (sin WhatsApp)
 - [x] Modelos SQLAlchemy + migraciones Alembic
-- [ ] Carga de semillas
+- [x] Carga de semillas
 - [ ] Carrito y reglas: validación de opciones, adicionales, total
 - [ ] Servicio de IA (interfaz + 1 proveedor) → texto a JSON
 - [ ] Motor de conversación (máquina de estados)
