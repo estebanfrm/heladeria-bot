@@ -5,14 +5,14 @@ IA local: Ollama, `gemma4-heladeria:12b`, basado en `gemma4:12b`, sin razonamien
 
 ## Resultado
 
-- **211 pruebas automáticas aprobadas**, sin casos omitidos. Ruff y formato correctos.
-- **27/27 escenarios de extremo a extremo aprobados con el modelo real**.
-- **8/8 escenarios originales del chat aprobados**, como comprobación de regresión.
-  Los 27 escenarios tardaron 83,96 segundos en total; el más lento, 20,62 segundos.
+- **220 pruebas automáticas aprobadas**, sin casos omitidos. Ruff y formato correctos.
+- **28/28 escenarios de extremo a extremo aprobados con el modelo real**, incluyendo
+  los 27 anteriores y el caso de cinco micheladas con «Todas maracuya».
+  Los 28 escenarios tardaron 67,12 segundos en total; el más lento, 29,39 segundos.
 - Datos y cuentas ficticios de `seeds/demo.json`; transacciones revertidas, sin envío
   de WhatsApp ni pedidos guardados en producción.
 - Evidencia detallada, con mensajes, respuestas y JSON del modelo:
-  `.local/robustez-final.json` (archivo privado excluido de Git).
+  `.local/robustez-micheladas.json` (archivo privado excluido de Git).
 - Versión activada en el servidor de prueba del puerto 8001. El túnel responde;
   las solicitudes sin verificación siguen rechazándose y `/docs` sigue sin publicarse.
 
@@ -24,6 +24,7 @@ IA local: Ollama, `gemma4-heladeria:12b`, basado en `gemma4:12b`, sin razonamien
 | «dos granisados de mora», «granizado de cafe» | Respeta cantidad, sabor y precio del menú. |
 | «copa keso con brauni y freza…», «copa de qeso…» | Conserva brownie, fresa, salsa frutos rojos y el topping solicitado. |
 | «malteda de 12 oz de vainilla» | Reconoce la malteada y pregunta salsa/topping; no inventa elecciones. |
+| Cinco micheladas, «Todas maracuya» | Explica que maracuyá pertenece a la mezcla frutos amarillos, solicita confirmación y conserva las cinco unidades. |
 | Hamburguesa, «eso mismo de la otra vez», «uno de» | No crea un pedido ni inventa una selección. |
 | Cambiar lulo por café o mora antes de pagar | Mantiene el pedido original hasta reconfirmar; después conserva el número y recalcula el precio. |
 | Quitar mora y mantener lulo | Quita exclusivamente el producto indicado. |
@@ -65,10 +66,14 @@ demasiado largos. Las decisiones financieras usan datos del menú y la BD.
 4. La evaluación inicial esperaba erróneamente que una malteada sin salsa/topping
    estuviese completa. Se corrigió el escenario para exigir la pregunta de faltantes
    y comprobar el sabor solicitado.
+5. En micheladas, «maracuya» era rechazado sin explicar que el menú ofrece una mezcla
+   de maracuyá y lulo. Ahora se propone confirmar la mezcla con un botón o «sí» si
+   hay una sola propuesta; no se crean sabores nuevos, no se elige automáticamente
+   una mezcla y se conserva la cantidad. Las mezclas agotadas o ambiguas no se sugieren.
 
 ## Alcance
 
-Los 27 resultados comprueban los mensajes concretos de la tabla; no garantizan que la
+Los 28 resultados comprueban los mensajes concretos de la tabla; no garantizan que la
 IA interprete cualquier forma de escribir. El resumen y la confirmación son obligatorios.
 Un comprobante recibido bloquea la edición automática y queda pendiente de revisión:
 la imagen no se considera prueba de pago verificado. El panel de verificación y las

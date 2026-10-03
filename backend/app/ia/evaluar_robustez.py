@@ -37,6 +37,7 @@ class Caso:
 
 
 CASOS = [
+    Caso("michelada_maracuya", "Todas maracuya", "mezcla", "michelada_soda", 5),
     Caso("granizado_correcto", "quiero un granizado de lulo"),
     Caso("granisado", "un granisado de lulo"),
     Caso("granizado_sin_espacios", "un granizadodelulo"),
@@ -116,9 +117,11 @@ def evaluar(caso, db, proveedor, menu):
     enviar(boton="pedir")
     conv = db.scalars(select(Conversacion)).one()
     originales = [{"producto": "granizado_lulo", "cantidad": 1}]
+    if caso.clase == "mezcla":
+        originales = [{"producto": caso.producto, "cantidad": caso.cantidad}]
     if caso.clase != "pedido" and caso.clase not in {"desconocido", "ambiguo"}:
         conv.contexto_json["carrito"] = originales
-        conv.estado = E.RESUMEN
+        conv.estado = E.COMPLETANDO_OPCIONES if caso.clase == "mezcla" else E.RESUMEN
     if caso.clase in {"cambio", "cambio_efectivo", "pago"}:
         enviar(boton="confirmar")
         enviar(boton="entrega:recoger")
@@ -150,6 +153,25 @@ def evaluar(caso, db, proveedor, menu):
             fallo = "Los sabores, salsa o topping no coinciden con lo solicitado"
         elif pedidos:
             fallo = "Registró un pedido sin confirmación"
+    elif caso.clase == "mezcla":
+        if (
+            conv.estado is not E.COMPLETANDO_OPCIONES
+            or not respuestas[0].botones
+            or carrito[0].get("opciones", {}).get("variante") == ["frutos_amarillos"]
+        ):
+            fallo = "No pidió confirmar la mezcla sin elegirla automáticamente"
+        else:
+            nueva = enviar(boton=respuestas[0].botones[0].id)
+            respuestas += nueva
+            carrito = conv.contexto_json.get("carrito", [])
+            if (
+                conv.estado is not E.RESUMEN
+                or len(carrito) != 1
+                or carrito[0]["cantidad"] != 5
+                or carrito[0].get("opciones", {}).get("variante") != ["frutos_amarillos"]
+                or db.scalars(select(Pedido)).all()
+            ):
+                fallo = "La confirmación de mezcla no conservó las cinco unidades o creó un pedido"
     elif caso.clase in {"cambio", "cambio_efectivo"}:
         if [(p.id, p.total, p.estado.value) for p in pedidos] != previo:
             fallo = "Cambió el pedido antes de reconfirmar"

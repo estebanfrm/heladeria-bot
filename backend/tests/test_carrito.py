@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.enums import TipoEntrega
+from app.menu.schema import Opcion
 from app.pedidos.carrito import (
     AdicionalSolicitado,
     ItemSolicitado,
@@ -24,6 +25,20 @@ BANANA_SPLIT = ItemSolicitado(
         "topping": ["oreo"],
     },
 )
+
+
+@pytest.mark.parametrize("modificacion", ["ambigua", "agotada"])
+def test_no_sugiere_mezcla_si_ingrediente_es_ambiguo_o_mezcla_agotada(menu_demo, modificacion):
+    grupo = menu_demo.grupo("sabores_michelada")
+    if modificacion == "agotada":
+        next(o for o in grupo.opciones if o.id == "frutos_amarillos").disponible = False
+    else:
+        grupo.opciones.append(Opcion(id="otra_mezcla", nombre="Otra mezcla (maracuyá y fresa)"))
+    resultado = validar_carrito(
+        menu_demo, [ItemSolicitado(producto="michelada_soda", opciones={"variante": ["maracuya"]})]
+    )
+    assert not resultado.completo
+    assert all(p.opcion_sugerida is None for p in resultado.items[0].problemas)
 
 
 def _codigos(problemas) -> list[str]:

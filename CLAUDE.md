@@ -117,14 +117,17 @@ npx vitest run && npm run type-check && npx eslint . && npx prettier --check src
   5. ✅ Edición del mismo pedido antes de pago/despacho con reconfirmación y descarte;
      comprobante/pago/despacho bloquean cambios automáticos. Precios y cuentas desde la BD,
      sin descuentos inventados ni pagos declarados por texto; cantidades positivas y límites.
-  6. ✅ Suite actual: 211 tests del backend. Pruebas reales de recepción, respuestas y PDF
+  6. ✅ Suite actual: 220 tests del backend. Pruebas reales de recepción, respuestas y PDF
      confirmadas por el usuario; token de prueba y túnel temporal, todavía no producción.
-     Evaluación reproducible con IA real: `python -m app.ia.evaluar_robustez` (27 escenarios,
+     Evaluación reproducible con IA real: `python -m app.ia.evaluar_robustez` (28 escenarios,
      menú demo, BD heladeria_test, rollback, sin envío WhatsApp). Informes locales fuera de Git.
-     Resultado: 27/27 y regresión original 8/8. Informe `docs/PRUEBAS_ROBUSTEZ.md`.
+     Resultado: 28/28, incluyendo micheladas y los 27 escenarios anteriores.
+     Informe `docs/PRUEBAS_ROBUSTEZ.md`.
      Modelo local actual `gemma4-heladeria:12b` (base gemma4:12b, num_ctx 4096, num_batch 64);
      servidor Ollama con LLAMA_ARG_CACHE_RAM=0 y LLAMA_ARG_CTX_CHECKPOINTS=0 por bad_alloc.
      «Nuevo chat» probado también por webhook firmado y al repetir el botón. El token
      temporal de Meta venció el 02/10 a las 20:00 (Cali); renovado en .env y servidor reiniciado.
+     Ingredientes de una mezcla en micheladas piden confirmación con botón, conservando
+     las cantidades; no crean sabores individuales ni eligen mezclas ambiguas/agotadas.
   7. ⏭️ Siguiente: notificaciones al personal, comprobantes y estados del pedido;
      token permanente y registro del número real.

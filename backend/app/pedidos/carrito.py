@@ -5,9 +5,12 @@ con códigos del menú, sin precios. Aquí se valida todo y se calculan subtotal
 total con los precios del `Menu` (que viene de la BD).
 """
 
+import re
+
 from pydantic import BaseModel, Field, computed_field, field_validator
 
 from app.config import settings
+from app.conversacion.protecciones import normalizar
 from app.enums import TipoEntrega, TipoGrupo
 from app.menu.schema import GrupoOpciones, Menu, Opcion, Producto
 
@@ -48,6 +51,9 @@ class ItemSolicitado(BaseModel):
 class Problema(BaseModel):
     codigo: str  # para el motor, ej. "opcion_agotada"
     mensaje: str  # para el cliente
+    opcion_original: str | None = None
+    opcion_sugerida: str | None = None
+    tipo: TipoGrupo | None = None
 
 
 class Faltante(BaseModel):
@@ -192,7 +198,9 @@ def _validar_selecciones(
     for seleccion in producto.selecciones:
         grupo = grupos[seleccion.grupo]
         codigos = item.opciones.get(grupo.tipo, [])
-        elegidas = _opciones_validas(grupo, codigos, producto.nombre, resultado.problemas)
+        elegidas = _opciones_validas(
+            grupo, codigos, producto.nombre, resultado.problemas, sugerir_mezcla=True
+        )
 
         if not seleccion.permite_repetir and len(set(codigos)) != len(codigos):
             resultado.problemas.append(
@@ -269,7 +277,12 @@ def _validar_adicionales(
 
 
 def _opciones_validas(
-    grupo: GrupoOpciones, codigos: list[str], para: str, problemas: list[Problema]
+    grupo: GrupoOpciones,
+    codigos: list[str],
+    para: str,
+    problemas: list[Problema],
+    *,
+    sugerir_mezcla: bool = False,
 ) -> list[Opcion]:
     """Opciones del grupo que existen y están disponibles; las demás se reportan."""
     por_codigo = {o.id: o for o in grupo.opciones}
@@ -277,6 +290,20 @@ def _opciones_validas(
     for codigo in codigos:
         opcion = por_codigo.get(codigo)
         if opcion is None:
+            sugerida = _mezcla_por_ingrediente(grupo, codigo) if sugerir_mezcla else None
+            if sugerida:
+                problemas.append(
+                    Problema(
+                        codigo="mezcla_por_confirmar",
+                        mensaje=f"En {para}, '{codigo}' forma parte de {sugerida.nombre}. "
+                        "No figura como sabor individual. ¿Quieres esa mezcla? "
+                        "Confírmala o elige otra opción.",
+                        opcion_original=codigo,
+                        opcion_sugerida=sugerida.id,
+                        tipo=grupo.tipo,
+                    )
+                )
+                continue
             problemas.append(
                 Problema(
                     codigo="opcion_no_existe",
@@ -292,6 +319,18 @@ def _opciones_validas(
         else:
             validas.append(opcion)
     return validas
+
+
+def _mezcla_por_ingrediente(grupo: GrupoOpciones, codigo: str) -> Opcion | None:
+    """Sugiere únicamente una mezcla inequívoca del grupo; nunca cambia la selección."""
+    coincidencias = []
+    for opcion in grupo.opciones:
+        componentes = re.search(r"\(([^()]+)\)", opcion.nombre)
+        if componentes and opcion.disponible:
+            ingredientes = re.split(r",|\s+y\s+", normalizar(componentes.group(1)))
+            if normalizar(codigo.replace("_", " ")) in {i.strip() for i in ingredientes}:
+                coincidencias.append(opcion)
+    return coincidencias[0] if len(coincidencias) == 1 else None
 
 
 def _faltante(grupo: GrupoOpciones, cantidad: int, adicional: str | None = None) -> Faltante:
