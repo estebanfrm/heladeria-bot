@@ -19,6 +19,7 @@
   "grupos_opciones": [
     {
       "id": "sabores",
+      "tipo": "sabor",
       "nombre": "Sabor de helado",
       "opciones": [
         { "id": "vainilla_chips", "nombre": "Vainilla chips" },
@@ -36,6 +37,7 @@
     },
     {
       "id": "salsas_waffle",
+      "tipo": "salsa",
       "nombre": "Salsa",
       "opciones": [
         { "id": "frutos_rojos", "nombre": "Frutos rojos" },
@@ -46,6 +48,7 @@
     },
     {
       "id": "salsas_base",
+      "tipo": "salsa",
       "nombre": "Salsa",
       "opciones": [
         { "id": "frutos_rojos", "nombre": "Frutos rojos" },
@@ -55,6 +58,7 @@
     },
     {
       "id": "salsas_generales",
+      "tipo": "salsa",
       "nombre": "Salsa",
       "opciones": [
         { "id": "frutos_rojos", "nombre": "Frutos rojos" },
@@ -66,6 +70,7 @@
     },
     {
       "id": "toppings_waffle",
+      "tipo": "topping",
       "nombre": "Topping",
       "opciones": [
         { "id": "mani", "nombre": "Maní" },
@@ -80,6 +85,7 @@
     },
     {
       "id": "toppings_base",
+      "tipo": "topping",
       "nombre": "Topping",
       "opciones": [
         { "id": "oreo", "nombre": "Oreo triturado" },
@@ -90,6 +96,7 @@
     },
     {
       "id": "frutas_waffle",
+      "tipo": "fruta",
       "nombre": "Fruta",
       "opciones": [
         { "id": "fresa", "nombre": "Fresa" },
@@ -99,6 +106,7 @@
     },
     {
       "id": "sabores_michelada",
+      "tipo": "variante",
       "nombre": "Sabor de michelada",
       "opciones": [
         { "id": "frutos_rojos", "nombre": "Frutos rojos (fresa, manzana roja y uva)" },
@@ -108,6 +116,7 @@
     },
     {
       "id": "figuras_infantil",
+      "tipo": "variante",
       "nombre": "Figura",
       "opciones": [
         { "id": "buho", "nombre": "Búho" },

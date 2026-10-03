@@ -50,7 +50,7 @@ Análisis de un chat real exportado (28/09/2026):
 | 7:56 | Cliente | Brownie, vainilla chips, brownie · frutos rojos · oreo |
 | 7:56 | Heladería | ¿Y para la copa queso qué salsa y topping? |
 | 7:57 | Heladería | Serían $24.000 · ¿Con cuánto cancela? · Dirección |
-| 7:58 | Cliente | Por Nequi, me mandas el número · Cra 40 #96a18 |
+| 7:58 | Cliente | Por Nequi, me mandas el número · Calle Falsa #12-34 |
 | 7:58 | Heladería | Con gusto, ya se te prepara |
 | 8:03 | Cliente | *(imagen — comprobante)* |
 | 8:14 | Heladería | Ya salió tu pedido |
@@ -249,7 +249,7 @@ Solo si más adelante se quiere que cualquier persona escriba al bot por WhatsAp
 | Control de versiones | Git + GitHub (`estebanfrm`) |
 | Contenedores | Docker Desktop (con WSL 2 en Windows) |
 | Python | Python 3.12 + **uv** (entornos y dependencias) |
-| Node | Node.js 22 LTS + pnpm |
+| Node | Node.js 22.18+ (recomendado 24 LTS) + **npm** (pnpm vía corepack falló con Node 22.14 y exigía permisos de admin) |
 | Base de datos local | PostgreSQL 16 en Docker + DBeaver como cliente gráfico |
 | Exponer el webhook local a Meta | **Cloudflare Tunnel** (`cloudflared`) o ngrok |
 | Probar la API | Swagger de FastAPI (`/docs`) + Bruno |
@@ -304,7 +304,8 @@ INICIO
             PEDIDO_CONFIRMADO ──► (WhatsApp personal o panel) EN_PREPARACION ──► ENVIADO ──► FIN
 
   En cualquier estado:  "asesor"/2 fallos → HUMANO (bot se pausa)
-                        inactividad 30 min → recordatorio → cancelado
+                        inactividad 30 min → chat cerrado → «Nuevo chat» → SALUDO
+                        (ESPERANDO_PAGO conserva su propio plazo de pago)
 ```
 
 ### Ejemplo de conversación objetivo
@@ -322,7 +323,7 @@ INICIO
 > **Total: $24.000** *[Confirmar]* *[Agregar algo]* *[Cambiar]*
 > **Cliente:** *[Confirmar]*
 > **Bot:** ¿A qué dirección lo enviamos y cómo pagas? *[Nequi]* *[Daviplata]* *[Bancolombia]* *[Efectivo]*
-> **Cliente:** Cra 40 #96a18, Nequi
+> **Cliente:** Calle Falsa #12-34, Nequi
 > **Bot:** Envía $24.000 al Nequi **300 000 0000** a nombre de Heladería Demo y mándame el comprobante 📸
 > **Cliente:** *(imagen)*
 > **Bot:** ¡Recibido! En cuanto confirmemos el pago empezamos a preparar tu pedido ✅
@@ -337,7 +338,7 @@ Cada pedido confirmado se envía por WhatsApp a los números del personal (confi
 ```
 🍦 PEDIDO #0042 — 7:57 p. m.
 👤 Laura · 300 123 4567
-📍 Cra 40 #96a18
+📍 Calle Falsa #12-34
 💳 Nequi — comprobante adjunto ⬇️
 
 1× Copa queso — $12.000
@@ -416,28 +417,53 @@ Resultado en el mensaje al personal:
 
 ## 8. Modelo de datos
 
-```
-producto           (id, nombre, categoria, precio, descripcion, activo,
-                    num_sabores, num_salsas, num_toppings, num_frutas)
-grupo_opcion       (id, tipo: sabor|salsa|topping|fruta|variante, nombre)
-opcion             (id, grupo_id, nombre, disponible)
-producto_grupo     (producto_id, grupo_id, cantidad)   -- qué listas aplica a cada producto
-adicional          (id, nombre, precio)
-medio_pago         (id, nombre, numero_cuenta, titular, activo)
+Implementado en `backend/app/models/` + migraciones Alembic `0001` (esquema inicial) y `0002` (versión del menú y `activo` en el catálogo).
 
-cliente            (id, telefono, nombre, ultima_direccion, acepto_datos, creado)
-conversacion       (id, cliente_id, canal: whatsapp|web, estado, contexto_json,
-                    modo: bot|humano, actualizado)
+```
+negocio            (id, nombre, moneda, ciudad, horario, costo_domicilio, nota_domicilio,
+                    version_menu)                                  -- 1 fila
+categoria          (id, codigo, nombre, orden, activo)
+grupo_opcion       (id, codigo, tipo: sabor|salsa|topping|fruta|variante, nombre, activo)
+opcion             (id, grupo_id, codigo, nombre, disponible, activo)  -- único (grupo_id, codigo)
+producto           (id, codigo, nombre, categoria_id, precio, descripcion, activo)
+producto_seleccion (producto_id, grupo_id, cantidad, permite_repetir, orden)  -- qué elige el cliente
+adicional          (id, codigo, nombre, precio, grupo_id?, activo)  -- grupo_id: elegir cuál (ej. topping)
+medio_pago         (id, codigo, nombre, numero_cuenta?, titular?, requiere_comprobante, activo)
+
+cliente            (id, telefono?, nombre, ultima_direccion, acepto_datos_en, creado)
+conversacion       (id, cliente_id, canal: whatsapp|web, id_externo, estado, modo: bot|humano,
+                    contexto_json, creado, actualizado)            -- único (canal, id_externo)
 mensaje            (id, conversacion_id, origen: cliente|bot|humano, texto, media_url, creado)
 
-pedido             (id, cliente_id, conversacion_id, estado, subtotal, domicilio, total,
-                    direccion, medio_pago_id, comprobante_url, creado)
-item_pedido        (id, pedido_id, producto_id, cantidad, precio_unitario, notas)
-item_opcion        (item_id, opcion_id)
-item_adicional     (item_id, adicional_id, cantidad, precio)
+pedido             (id, cliente_id, conversacion_id, estado, tipo_entrega: domicilio|recoger,
+                    subtotal, domicilio, total, direccion, medio_pago_id, comprobante_url,
+                    creado, actualizado)                           -- CHECK total = subtotal + domicilio
+item_pedido        (id, pedido_id, producto_id, nombre, cantidad, precio_unitario, notas)
+item_opcion        (id, item_id, opcion_id, nombre, posicion)      -- único (item_id, posicion)
+item_adicional     (id, item_id, adicional_id, opcion_id?, nombre, cantidad, precio_unitario)
 ```
 
 Estados del pedido: `BORRADOR → PENDIENTE_PAGO → PAGO_VERIFICADO → EN_PREPARACION → ENVIADO → ENTREGADO` (+ `CANCELADO`).
+Estados de la conversación: los de la sección 7 (+ `CANCELADA` por inactividad); `HUMANO` es el campo `modo`.
+
+**Decisiones del modelo:**
+
+- PK entera + `codigo` estable (el `id` del seed, ej. `copa_queso`): la IA trabaja con códigos y el panel puede renombrar sin romper relaciones.
+- `producto_seleccion` reemplaza las columnas `num_sabores/num_salsas/…`: una sola fuente para las reglas, igual que en el seed.
+- `opcion` es única **por grupo**: `frutos_rojos` es salsa en 3 grupos y sabor de michelada; `fresa` es sabor, salsa y fruta. Con `tipo` + `codigo` el panel puede marcar agotada "salsa frutos rojos" en todos sus grupos.
+- `item_opcion` tiene id propio y `posicion` para permitir sabores repetidos (brownie, vainilla chips, brownie).
+- Nombres y precios se **copian** en el pedido: si cambia el menú, los pedidos viejos no cambian.
+- Dinero en `Integer` (pesos COP). Enums como `VARCHAR(30)` validados por SQLAlchemy (sin `ENUM` de Postgres ni `CHECK`): agregar un valor no requiere migración.
+- Composición con `ON DELETE CASCADE` (opciones de un grupo, ítems de un pedido, mensajes); el catálogo usado en pedidos no se borra, se desactiva.
+- `activo` = sigue en la carta (lo controla el seed y luego el panel); `disponible` = no está agotado hoy (panel).
+
+**Carga del menú (`app/menu/carga.py`):** `uv run python -m app.menu.carga` sincroniza la BD con `SEED_FILE` por `codigo` (idempotente; lo que sale del seed queda `activo=False`). Aplicar el seed sobrescribe lo editado en el panel, por eso al arrancar el contenedor se usa `--auto`: solo carga si la BD no tiene menú o el seed trae una `version` mayor que `negocio.version_menu`. `/menu` lee la carta vigente desde la BD con el mismo esquema Pydantic del seed.
+
+**Pendiente de modelar en su fase (cada uno con su migración):**
+
+- Fase 2: alerta "❌ Pago no llega" y marcas de recordatorio 15/60 min en `pedido` (7.1, 7.2); `mensaje.id_externo` único para no procesar dos veces el mismo webhook de WhatsApp; tabla `personal` (números + ventana de 24 h / "turno") cuando deje de bastar `STAFF_PHONES` en `.env`.
+- Al confirmar con la heladería: tiempo estimado de entrega en `negocio`, zonas de domicilio.
+- Fuera del MVP: referencia de comprobante única (pago nivel 2), referencia de pasarela (nivel 3).
 
 ---
 
@@ -495,6 +521,7 @@ APP_BASE_URL=http://localhost:8000
 SEED_FILE=seeds/demo.json
 
 # Base de datos
+DB_PORT=5432              # puerto del host para el Postgres de docker-compose
 DATABASE_URL=postgresql+psycopg://user:pass@localhost:5432/heladeria
 
 # WhatsApp Cloud API
@@ -504,9 +531,11 @@ WA_VERIFY_TOKEN=
 WA_APP_SECRET=
 
 # IA
-IA_PROVIDER=gemini        # gemini | groq | ollama | openai | anthropic
+IA_PROVIDER=gemini        # gemini | groq | ollama | openai (API compatible con OpenAI) | anthropic (pendiente)
 IA_MODEL=
 IA_API_KEY=
+IA_BASE_URL=              # opcional: otra URL compatible con OpenAI
+IA_TIMEOUT=20
 
 # Límites
 WEB_CHAT_MAX_MSGS_PER_SESSION=20
@@ -520,7 +549,15 @@ WEB_CHAT_MAX_MSGS_PER_SESSION=20
 | Neon | `pg_dump` | PostgreSQL en el VPS |
 | Gemini gratis | `.env` | GPT-5.6 Luna |
 | Número de prueba de Meta | `.env` + Meta | Número de la heladería |
-| `seeds/demo.json` | `.env` | `seeds/heladeria.json` |
+| `seeds/demo.json` (dentro de la imagen) | `SEED_FILE` en `.env` + volumen | `seeds/heladeria.json` (montado, nunca en la imagen) |
+
+### Imagen Docker y menú semilla
+
+- El build usa la **raíz del repo** como contexto (`docker build -f backend/Dockerfile .`) y la imagen replica la estructura del repo en `/app` (`/app/backend`, `/app/seeds`).
+- `.dockerignore` es una **lista blanca**: solo entran el código del backend, las migraciones y `seeds/demo.json`. `.env` y `seeds/heladeria.json` nunca llegan a la imagen (lo verifica el CI).
+- **Demo (Render gratis, sin discos):** la imagen ya trae `demo.json`; no se configura nada. En Render: *Dockerfile Path* = `backend/Dockerfile`, *Docker Build Context* = raíz del repo.
+- **Producción (VPS con docker compose):** se copia `seeds/heladeria.json` al servidor (scp, fuera de git), se monta `./seeds:/app/seeds:ro` (ya está en `docker-compose.yml`) y `SEED_FILE=seeds/heladeria.json` en `.env`. Si se usara un PaaS pago, `SEED_FILE` acepta una ruta absoluta (ej. un archivo secreto montado).
+- Tras la primera carga, la BD es la fuente de verdad (el panel edita el menú); el seed solo se vuelve a aplicar si se sube su `version`.
 
 ### Pasos no técnicos de la migración
 
@@ -541,22 +578,28 @@ WEB_CHAT_MAX_MSGS_PER_SESSION=20
 - [x] Analizar chat real y menú
 - [x] Definir arquitectura, costos y estrategia
 - [x] Lista de sabores de helado (11 sabores)
-- [ ] Crear repositorio en GitHub (`estebanfrm/heladeria-bot` o similar)
+- [x] Crear repositorio en GitHub ([`estebanfrm/heladeria-bot`](https://github.com/estebanfrm/heladeria-bot))
 - [x] Estructura del repo, `docker-compose.yml`, `.env.example`
 - [x] `seeds/demo.json` con el menú estructurado + validación (`app/menu/schema.py` + test)
 
 ### Fase 1 — Núcleo (sin WhatsApp)
-- [ ] Modelos SQLAlchemy + migraciones Alembic
-- [ ] Carga de semillas
-- [ ] Carrito y reglas: validación de opciones, adicionales, total
-- [ ] Servicio de IA (interfaz + 1 proveedor) → texto a JSON
-- [ ] Motor de conversación (máquina de estados)
-- [ ] Endpoint de prueba `/chat` + pruebas con pytest usando los mensajes del chat real
+- [x] Modelos SQLAlchemy + migraciones Alembic
+- [x] Carga de semillas
+- [x] Carrito y reglas: validación de opciones, adicionales, total
+- [x] Servicio de IA (interfaz + 1 proveedor) → texto a JSON (`app/ia/`: un cliente compatible con OpenAI cubre gemini, groq, ollama y openai)
+- [x] Motor de conversación (máquina de estados) — `app/conversacion/`: botones sin IA, texto con IA, 2 fallos → humano; temporizadores (30 min, recordatorios de pago) en la Fase 2
+- [x] Endpoint de prueba `/chat` + pruebas con pytest usando los mensajes del chat real (`app/canales/web.py`: límite de mensajes por sesión, 500 caracteres, sin IA configurada siguen los botones)
 
 ### Fase 2 — Canales
-- [ ] Chat web (widget Vue) contra `/chat`
-- [ ] Configurar app en Meta for Developers + número de prueba
-- [ ] Webhook de WhatsApp (verificación, firma, recepción, envío)
+- [x] Chat web (widget Vue) contra `/chat` — `frontend/`: página de demo + widget (Vue 3, Vite, TS, Pinia, Tailwind 4); CORS por `CORS_ORIGINS`; probado de punta a punta con Ollama (pedido de $24.000)
+- [x] Configurar app en Meta for Developers + número de prueba
+- [x] Webhook de WhatsApp (verificación, firma, recepción, envío)
+  - [x] Preparar entrada de túnel limitada al webhook (`app.whatsapp_demo`, puerto 8001), verificar desafío/firma y bloquear los demás endpoints.
+  - [x] Conectar el túnel HTTPS temporal con Meta, guardar el webhook y suscribir `messages` v26.0. Credenciales completas en `.env`; cuenta de prueba vinculada mediante `subscribed_apps`; Graph API y firma HMAC comprobadas. Recepción y respuesta reales confirmadas por el usuario el 02/10/2026, con mensajes registrados en la BD. Funciona con el número de prueba; token temporal y túnel local, no producción.
+- [x] Menú PDF en WhatsApp configurado con `WA_MENU_PDF_FILE`: subida a Meta, envío como documento y reutilización del medio; el chat web conserva el texto.
+- [x] Corregir el caso real de dirección «Cra 8 #80-70»: reconocimiento directo en entrega, solicitud de número si está incompleta y comando «bot» para recuperar el carrito desde modo humano. Pruebas: 118 aprobadas.
+- [x] Ampliar direcciones al caso «CRA 40 96a02»: confirmación del formato compacto sin inventar separadores, variantes con espacios, corrección/recogida y aclaraciones de entrega ante fallos de IA sin perder carrito ni pasar a humano. Pruebas: 130 aprobadas.
+- [x] Cierre por inactividad a los 30 minutos configurables: temporizador persistente, aviso con «Nuevo chat», reapertura voluntaria sin carrito anterior, historial/pedidos conservados y protección de comprobantes pendientes. También comprueba vencimiento tras reiniciar el servidor; bloqueos y avisos pendientes coordinan los procesos. Pruebas: 145 aprobadas.
 - [ ] Mensajes interactivos (listas y botones)
 - [ ] Notificación de pedidos al personal (resumen + comprobante + botones de estado)
 - [ ] Comando "turno" para abrir la ventana de 24 h del personal
@@ -616,8 +659,12 @@ WEB_CHAT_MAX_MSGS_PER_SESSION=20
 - [ ] Permiso para usar nombre/menú real en el portafolio
 
 **Técnicos:**
-- [ ] Elegir proveedor de IA gratis para el demo (probar Gemini vs Groq con los casos reales)
-- [ ] Nombre del repositorio
+- [x] Elegir proveedor de IA gratis para el demo → **Gemini `gemini-3.5-flash-lite`** (02/10/2026). Respaldo: Groq `openai/gpt-oss-20b`. **Desarrollo local: Ollama `gemma4:12b` con `IA_REASONING_EFFORT=none`**.
+  - Groq gratis: 30 RPM, 1K RPD, 8K TPM, 200K TPD (≈ 80 mensajes/día con nuestro prompt de ~2,5K tokens) → corto para un demo público.
+  - Gemini: Flash y Flash-Lite con capa gratis (límites por proyecto en AI Studio); en capa gratis Google usa los datos para mejorar sus productos → aceptable con datos ficticios, no en producción.
+  - Ollama en el portátil (RTX 4060 8 GB) con `gemma4:12b`: el modelo razona antes de responder; con el contexto por defecto (4096 tokens) el razonamiento oculto (~1.900 tokens) cortaba el JSON y tardaba 22–151 s. Con `IA_REASONING_EFFORT=none`: **8/8 casos y 1–9 s por mensaje** → IA para desarrollo local (gratis, privada, sin límites). Render no alcanza el portátil, por eso el demo público usa Gemini.
+  - [ ] Confirmar con `uv run python -m app.ia.evaluar` cuando haya API key de Gemini (si falla algún caso, probar `gemini-3.8-flash`).
+- [x] Nombre del repositorio (`heladeria-bot`)
 
 ---
 

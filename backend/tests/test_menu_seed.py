@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from app.enums import TipoGrupo
 from app.menu.schema import Menu, cargar_menu
 
 SEED_DEMO = Path(__file__).resolve().parents[2] / "seeds" / "demo.json"
@@ -21,6 +22,15 @@ def test_once_sabores(menu):
     assert len(menu.grupo("sabores").opciones) == 11
 
 
+def test_grupos_tienen_tipo(menu):
+    tipos = {g.id: g.tipo for g in menu.grupos_opciones}
+    assert tipos["sabores"] is TipoGrupo.SABOR
+    assert {tipos[g] for g in ("salsas_waffle", "salsas_base", "salsas_generales")} == {
+        TipoGrupo.SALSA
+    }
+    assert tipos["figuras_infantil"] is TipoGrupo.VARIANTE
+
+
 def test_reglas_del_chat_real(menu):
     """Pedido real del 28/09/2026: copa queso + banana split = $24.000."""
     copa = menu.producto("copa_queso")
@@ -34,6 +44,14 @@ def test_demo_no_usa_cuentas_reales(menu):
     for m in menu.medios_pago:
         if m.cuenta:
             assert set(m.cuenta.replace(" ", "").replace("-", "")) <= {"0", "3"}
+
+
+def test_dos_grupos_del_mismo_tipo_en_producto_falla(menu):
+    datos = menu.model_dump()
+    copa = next(p for p in datos["productos"] if p["id"] == "copa_queso")
+    copa["selecciones"].append({"grupo": "salsas_generales", "cantidad": 1})
+    with pytest.raises(ValueError, match="'copa_queso': dos grupos del mismo tipo"):
+        Menu.model_validate(datos)
 
 
 def test_referencia_rota_falla(menu):

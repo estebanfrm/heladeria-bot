@@ -1,5 +1,6 @@
 # Entorno y secretos
 .env
+.local/
 seeds/heladeria.json
 
 # Python

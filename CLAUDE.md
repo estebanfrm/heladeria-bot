@@ -26,19 +26,41 @@ La planeación completa y todas las decisiones están en `PLANEACION.md` — lé
 
 - Backend: Python 3.12, FastAPI, SQLAlchemy 2, Alembic, Pydantic 2, pydantic-settings, httpx, pytest, ruff. Gestor: **uv**.
 - BD: PostgreSQL 16 (Docker).
-- Frontend (Fase 2): Vue 3 + Vite + TypeScript, Pinia, Vue Router, Tailwind.
+- Frontend: Vue 3 + Vite + TypeScript, Pinia, Vue Router, Tailwind 4, Vitest. Gestor: **npm**. Node 22.18+ (24 LTS en CI).
 - Despliegue demo: Render (backend), Neon (BD), Vercel (frontend).
 
 ## Estructura
 
 ```
-backend/app/config.py        configuración desde .env
-backend/app/main.py          endpoints (/health, /menu)
+backend/app/config.py        configuración desde .env (lee el .env de la raíz del repo)
+backend/app/main.py          endpoints (/health con estado de la IA, /menu desde la BD) + router del chat
+backend/app/canales/web.py   canal chat web: POST /chat {sesion?, texto, boton?} → motor (límite por sesión)
+backend/app/enums.py         valores cerrados del dominio (estados, canal, tipo de grupo…)
+backend/app/db.py            Base SQLAlchemy, engine, SessionLocal, get_db
+backend/app/models/          modelos de BD: menu.py, conversaciones.py, pedidos.py
 backend/app/menu/schema.py   modelos Pydantic + validación del menú semilla
-backend/tests/               pytest
+backend/app/menu/carga.py    seed → BD (sincroniza por codigo) y BD → Menu (carta vigente)
+backend/app/pedidos/carrito.py  ItemSolicitado (lo que entrega la IA: solo códigos) → validación,
+                             faltantes, problemas y montos (precios del Menu, nunca de la IA)
+backend/app/ia/              servicio de IA: prompt (menú sin precios) → proveedor → Interpretacion
+                             validada; proveedores.py (compatible OpenAI + falso), casos.py (chat real)
+backend/app/conversacion/    motor.py (máquina de estados de la sección 7: Entrada → Respuestas)
+                             y mensajes.py (textos y botones del bot)
+backend/app/pedidos/servicio.py  crear_pedido: carrito validado → Pedido con copia de nombres y precios
+backend/migrations/          Alembic (env.py toma DATABASE_URL de settings)
+backend/tests/               pytest (conftest.py: BD heladeria_test en Postgres real)
 seeds/demo.json              menú completo (26 productos, 11 sabores, adicionales, medios de pago ficticios)
-docker-compose.yml           db (postgres) + backend
+frontend/src/                api/chat.ts (cliente /chat), lib/formato.ts (negrita segura), stores/chat.ts,
+                             components/ChatWidget.vue, views/DemoView.vue (página del demo)
+docker-compose.yml           db (postgres) + backend (build con contexto = raíz del repo)
+.dockerignore                lista blanca: solo backend + seeds/demo.json entran a la imagen
 ```
+
+Imagen Docker: replica el repo en `/app`; trae solo `seeds/demo.json`. Datos reales
+(`seeds/heladeria.json`) se montan como volumen y se eligen con `SEED_FILE` (relativo a la raíz del repo).
+
+**Ojo (equipo de Esteban):** hay un PostgreSQL 18 nativo de Windows ocupando el 5432. El `.env` local usa
+`DB_PORT=5433` y `DATABASE_URL=...@localhost:5433/...`. En CI y Docker todo sigue en 5432.
 
 ## Comandos
 
@@ -48,10 +70,19 @@ uv sync
 uv run pytest
 uv run ruff check . && uv run ruff format --check .
 uv run uvicorn app.main:app --reload        # http://localhost:8000/docs
+uv run alembic upgrade head                 # aplicar migraciones
+uv run python -m app.menu.carga             # aplicar SEED_FILE a la BD (--auto: solo si hay versión nueva)
+uv run python -m app.ia.evaluar             # evalúa el proveedor de IA de .env con el chat real (necesita API key)
+uv run alembic revision --autogenerate -m "describe el cambio"   # tras cambiar un modelo (revisar el archivo generado)
 
 # desde la raíz
 docker compose up -d db                     # solo la BD
 docker compose up --build                   # todo
+docker build -f backend/Dockerfile .        # solo la imagen, como en Render (contexto = raíz)
+
+# desde frontend/
+npm run dev                                 # http://localhost:5173 (backend en :8000)
+npx vitest run && npm run type-check && npx eslint . && npx prettier --check src/
 ```
 
 ## Dominio del menú (resumen)
@@ -64,11 +95,26 @@ docker compose up --build                   # todo
 
 ## Estado actual
 
-- ✅ Fase 0: estructura del repo, menú semilla validado, 5 tests pasando.
-- ⏭️ **Siguiente: Fase 1 — Núcleo (sin WhatsApp)**, en este orden:
-  1. Modelos SQLAlchemy + migraciones Alembic (sección 8 de `PLANEACION.md`).
-  2. Carga del archivo semilla a la BD.
-  3. Carrito y reglas: validar selecciones por producto, adicionales y total. Tests con el caso real de $24.000.
-  4. Servicio de IA (interfaz + 1 proveedor) → texto a JSON validado.
-  5. Motor de conversación (máquina de estados, sección 7).
-  6. Endpoint `/chat` de prueba + tests con los mensajes del chat real.
+- ✅ Fase 0: estructura del repo, menú semilla validado. Repo: https://github.com/estebanfrm/heladeria-bot
+- ✅ **Fase 1 — Núcleo (sin WhatsApp)**:
+  1. ✅ Modelos SQLAlchemy + migraciones `0001`–`0002` (sección 8 de `PLANEACION.md`).
+  2. ✅ Carga del seed a la BD; `/menu` lee de Postgres.
+  3. ✅ Carrito y reglas (`app/pedidos/carrito.py`): caso real de $24.000.
+  4. ✅ Servicio de IA (`app/ia/`): gemini | groq | ollama | openai vía API compatible con OpenAI;
+     anthropic pendiente. IA del demo: Gemini `gemini-3.5-flash-lite` (falta la API key de Esteban).
+     Desarrollo local: Ollama `gemma4:12b` + `IA_REASONING_EFFORT=none` (8/8 casos, 1–9 s).
+  5. ✅ Motor de conversación (`app/conversacion/`).
+  6. ✅ Endpoint `POST /chat` (canal web). 95 tests.
+- 🔄 **Fase 2 — Canales** (sección 11 de `PLANEACION.md`):
+  1. ✅ Chat web: `frontend/` (página de demo + widget) contra `/chat`; CORS por `CORS_ORIGINS`.
+  2. ✅ WhatsApp Cloud API con número de prueba: webhook firmado, mensajes y botones;
+     entrada `app.whatsapp_demo` en puerto 8001 para el túnel temporal de Cloudflare.
+  3. ✅ Menú PDF configurable con `WA_MENU_PDF_FILE` (archivo local privado, fuera de Git),
+     reconocimiento de direcciones y confirmación de formatos compactos.
+  4. ✅ Cierre por inactividad a los 30 minutos (`CHAT_INACTIVITY_MINUTES`): aviso y
+     «Nuevo chat» para empezar sin el carrito anterior. Conserva pedidos e historial;
+     `ESPERANDO_PAGO` conserva su plazo aparte. Temporizador en ambas entradas del servidor.
+  5. ✅ Suite actual: 145 tests del backend. Pruebas reales de recepción, respuestas y PDF
+     confirmadas por el usuario; token de prueba y túnel temporal, todavía no producción.
+  6. ⏭️ Siguiente: notificaciones al personal, comprobantes y estados del pedido;
+     token permanente y registro del número real.

@@ -6,6 +6,21 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    services:
+      # Postgres para los tests de modelos y migraciones (mismas credenciales que docker-compose)
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: heladeria
+          POSTGRES_PASSWORD: heladeria
+          POSTGRES_DB: heladeria
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U heladeria"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -13,3 +28,36 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run pytest -q
+
+  docker:
+    # La imagen se construye igual que en Render (contexto = raíz del repo, sin volúmenes)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f backend/Dockerfile -t heladeria-backend .
+      - name: La imagen trae el seed demo válido
+        run: >-
+          docker run --rm heladeria-backend python -c "from app.config import settings;
+          from app.menu.schema import cargar_menu; print(cargar_menu(settings.seed_file).negocio.nombre)"
+      - name: La imagen no trae datos reales ni secretos
+        run: docker run --rm heladeria-backend sh -c 'test ! -e /app/seeds/heladeria.json && test ! -e /app/.env'
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npx oxlint .
+      - run: npx eslint .
+      - run: npx prettier --check src/ index.html
+      - run: npm run type-check
+      - run: npx vitest run
+      - run: npm run build-only
