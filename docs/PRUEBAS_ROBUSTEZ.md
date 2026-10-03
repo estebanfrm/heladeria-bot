@@ -5,14 +5,13 @@ IA local: Ollama, `gemma4-heladeria:12b`, basado en `gemma4:12b`, sin razonamien
 
 ## Resultado
 
-- **255 pruebas automáticas aprobadas**, sin casos omitidos. Ruff y formato correctos.
-- **34/34 escenarios de extremo a extremo aprobados con el modelo real**, incluyendo
+- **263 pruebas automáticas aprobadas**, sin casos omitidos. Ruff y formato correctos.
+- **35/35 escenarios de extremo a extremo aprobados con el modelo real**, incluyendo
   los anteriores, las tres variantes de las capturas y la copa seleccionada por listas.
-  Duración total: 107,21 segundos; el escenario más lento, 30,65 segundos.
 - Datos y cuentas ficticios de `seeds/demo.json`; transacciones revertidas, sin envío
   de WhatsApp ni pedidos guardados en producción.
 - Evidencia detallada, con mensajes, respuestas y JSON del modelo:
-  `.local/robustez-seleccion.json` (archivo privado excluido de Git).
+  `.local/robustez-pago-direccion.json` (archivo privado excluido de Git).
 - Versión activada en el servidor de prueba del puerto 8001. El túnel responde;
   las solicitudes sin verificación siguen rechazándose y `/docs` sigue sin publicarse.
   El envío real depende también de renovar el token temporal de Meta cuando vence.
@@ -39,6 +38,7 @@ IA local: Ollama, `gemma4-heladeria:12b`, basado en `gemma4:12b`, sin razonamien
 | Cero, -2 o 1.5 unidades | Solicita un entero positivo y conserva el pedido. |
 | 999999 unidades | No permite confirmar ni registrar el pedido. |
 | «CRA 40» y «CRA 40 96a02» | Pide completar o confirmar la dirección; no registra un pedido prematuramente. |
+| Confirmar granizado → elegir efectivo → escribir dirección | Primero pregunta solo método de pago, luego dirección sin recogida; registra un único pedido al precio del menú después de recibirla. |
 
 Las pruebas automáticas cubren también efectivo/datáfono, cambio de dirección y medio
 de pago, importe del domicilio, descarte de cambios, botones anteriores, confirmación
@@ -52,6 +52,13 @@ reinicio de selecciones y listas antiguas tras cierre/reapertura. Rechaza códig
 manipulados, opciones de otro grupo y opciones agotadas después de mostrar la lista.
 No modifica pedidos registrados ni una edición si se verifica el pago entre pasos.
 Los mensajes de lista caben en las restricciones de filas, títulos y cuerpo de WhatsApp.
+
+Después de confirmar el resumen se pregunta solo el método de pago; después, únicamente
+la dirección. Probado con Nequi, Daviplata, efectivo y datáfono, dirección anticipada,
+medio inválido y fallo de IA sin pasar a humano. El domicilio se informa al pedir dirección
+y se calcula al registrar. No se muestran botones ni sugerencias de recogida; pulsar un
+botón antiguo no selecciona recogida ni borra una dirección pendiente de confirmación.
+La recogida se conserva solo si el cliente la solicita por texto.
 
 Se verificó también el botón «Nuevo chat» mediante un webhook firmado: después del
 cierre envía el saludo, borra el borrador anterior y funciona si se vuelve a pulsar.
@@ -90,7 +97,7 @@ demasiado largos. Las decisiones financieras usan datos del menú y la BD.
 
 ## Alcance
 
-Los 34 resultados comprueban los mensajes concretos de la tabla; no garantizan que la
+Los 35 resultados comprueban los mensajes concretos de la tabla; no garantizan que la
 IA interprete cualquier forma de escribir. El resumen y la confirmación son obligatorios.
 Un comprobante recibido bloquea la edición automática y queda pendiente de revisión:
 la imagen no se considera prueba de pago verificado. El panel de verificación y las

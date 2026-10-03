@@ -169,20 +169,13 @@ def resumen(resultado: ResultadoCarrito) -> Respuesta:
 def pedir_entrega(menu: Menu, entrega: DatosEntrega, aviso: str | None = None) -> Respuesta:
     falta_direccion = entrega.tipo is not TipoEntrega.RECOGER and not entrega.direccion
     falta_pago = entrega.medio_pago is None
-    if falta_direccion and falta_pago:
-        texto = "¿A qué dirección lo enviamos y cómo pagas? (si prefieres, lo recoges en el local)"
-    elif falta_direccion:
-        texto = "¿A qué dirección lo enviamos? (o dime si lo recoges en el local)"
-    else:
-        texto = "¿Cómo vas a pagar?"
-    if falta_direccion and menu.negocio.domicilio.costo:
+    texto = "¿Qué método de pago vas a usar?" if falta_pago else "¿A qué dirección lo enviamos?"
+    if not falta_pago and falta_direccion and menu.negocio.domicilio.costo:
         texto += f"\nEl domicilio cuesta {pesos(menu.negocio.domicilio.costo)}."
 
     botones = (
         [Boton(id=f"pago:{m.id}", titulo=m.nombre) for m in menu.medios_pago] if falta_pago else []
     )
-    if falta_direccion:
-        botones.append(Boton(id="entrega:recoger", titulo="Recoger en el local"))
     return Respuesta(texto=f"{aviso}\n{texto}" if aviso else texto, botones=botones)
 
 
@@ -200,7 +193,6 @@ def aclarar_direccion() -> Respuesta:
     return Respuesta(
         texto="Necesito la dirección completa para el domicilio: vía, número y placa. "
         "Por ejemplo: «Cra 40 #96A-02». Puedes añadir apartamento y barrio.",
-        botones=[Boton(id="entrega:recoger", titulo="Recoger en el local")],
     )
 
 

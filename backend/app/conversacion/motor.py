@@ -197,6 +197,16 @@ class Motor:
         if e.texto.strip().lower() in {"menu", "menú", "ver menu", "ver menú"}:
             return self._carta(conv, menu)
         if conv.estado is E.DATOS_ENTREGA:
+            if texto in {
+                "recoger en el local",
+                "lo recojo en el local",
+                "voy a recogerlo en el local",
+            }:
+                conv.contexto_json.pop("direccion_por_confirmar", None)
+                conv.contexto_json["entrega"] = self._entrega(
+                    conv, DatosEntrega(tipo=TipoEntrega.RECOGER)
+                ).model_dump(mode="json")
+                return self._datos_entrega(conv, menu)
             direccion = e.texto.strip()
             if conv.contexto_json.get("direccion_por_confirmar") and direccion.lower() in {
                 "sí",
@@ -215,7 +225,10 @@ class Motor:
             if DIRECCION_COMPACTA.fullmatch(direccion):
                 conv.contexto_json["fallos"] = 0
                 conv.contexto_json["direccion_por_confirmar"] = direccion
-                return [mensajes.confirmar_direccion(direccion)]
+                return self._datos_entrega(conv, menu)
+            entrega = DatosEntrega.model_validate(conv.contexto_json.get("entrega", {}))
+            if entrega.medio_pago is None and INICIO_DIRECCION.match(direccion):
+                return self._datos_entrega(conv, menu)
             if re.fullmatch(CALLE, direccion, re.IGNORECASE):
                 conv.contexto_json["fallos"] = 0
                 conv.contexto_json.pop("direccion_por_confirmar", None)
@@ -325,12 +338,11 @@ class Motor:
                 datos = DatosEntrega(direccion=direccion)
             elif boton == "direccion:corregir":
                 conv.contexto_json.pop("direccion_por_confirmar", None)
+                if not conv.contexto_json.get("entrega", {}).get("medio_pago"):
+                    return self._datos_entrega(conv, menu)
                 return [mensajes.aclarar_direccion()]
             elif boton.startswith("pago:"):
                 datos = DatosEntrega(medio_pago=boton.removeprefix("pago:"))
-            elif boton == "entrega:recoger":
-                conv.contexto_json.pop("direccion_por_confirmar", None)
-                datos = DatosEntrega(tipo=TipoEntrega.RECOGER)
             else:
                 return self._paso_actual(conv, menu)
             conv.contexto_json["entrega"] = self._entrega(conv, datos).model_dump(mode="json")
@@ -522,20 +534,22 @@ class Motor:
         return self._datos_entrega(conv, menu)
 
     def _datos_entrega(self, conv: Conversacion, menu: Menu) -> list[Respuesta]:
-        """Pide lo que falte de entrega y pago; si ya está todo, registra el pedido."""
+        """Pide primero pago y luego dirección; con todos los datos registra el pedido."""
         entrega = DatosEntrega.model_validate(conv.contexto_json.get("entrega", {}))
         medios = {m.id: m for m in menu.medios_pago}
         aviso = None
-        if entrega.medio_pago and entrega.medio_pago not in medios:
+        if entrega.medio_pago is not None and entrega.medio_pago not in medios:
             nombres = ", ".join(m.nombre for m in menu.medios_pago)
             aviso = f"⚠️ No recibimos «{entrega.medio_pago}». Puedes pagar con: {nombres}."
             entrega.medio_pago = None
             conv.contexto_json["entrega"] = entrega.model_dump(mode="json")
+        if entrega.medio_pago is None:
+            return [mensajes.pedir_entrega(menu, entrega, aviso)]
         falta_direccion = entrega.tipo is not TipoEntrega.RECOGER and not entrega.direccion
         if falta_direccion and conv.contexto_json.get("direccion_por_confirmar"):
             return [mensajes.confirmar_direccion(conv.contexto_json["direccion_por_confirmar"])]
-        if aviso or falta_direccion or entrega.medio_pago is None:
-            return [mensajes.pedir_entrega(menu, entrega, aviso)]
+        if falta_direccion:
+            return [mensajes.pedir_entrega(menu, entrega)]
 
         tipo = entrega.tipo or TipoEntrega.DOMICILIO
         resultado = validar_carrito(menu, self._carrito(conv), tipo)
@@ -636,8 +650,11 @@ class Motor:
         if conv.estado is E.DATOS_ENTREGA:
             conv.contexto_json["fallos"] = 0
             entrega = DatosEntrega.model_validate(conv.contexto_json.get("entrega", {}))
+            menu = leer_menu(self.session)
+            if entrega.medio_pago not in {m.id for m in menu.medios_pago}:
+                return self._datos_entrega(conv, menu)
             if entrega.direccion or entrega.tipo is TipoEntrega.RECOGER:
-                return self._paso_actual(conv, leer_menu(self.session))
+                return self._paso_actual(conv, menu)
             if conv.contexto_json.get("direccion_por_confirmar"):
                 return [mensajes.confirmar_direccion(conv.contexto_json["direccion_por_confirmar"])]
             return [mensajes.aclarar_direccion()]

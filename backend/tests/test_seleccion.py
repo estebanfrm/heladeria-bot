@@ -26,10 +26,12 @@ def formulario(db, menu_demo):
     proveedor = ProveedorFalso([])
     motor = Motor(db, proveedor)
 
-    def enviar(*, items=None, boton=None):
+    def enviar(*, items=None, boton=None, texto=None):
         if items is not None:
             proveedor.respuestas.append(json.dumps({"intencion": "pedido", "items": items}))
             entrada = Entrada(canal=Canal.WHATSAPP, id_externo="573000000000", texto="mi pedido")
+        elif texto is not None:
+            entrada = Entrada(canal=Canal.WHATSAPP, id_externo="573000000000", texto=texto)
         else:
             payload = {
                 "entry": [
@@ -122,7 +124,7 @@ def test_copa_completa_por_listas_repite_sabor_solo_con_otra_eleccion(db, formul
     assert len(formulario.proveedor.llamadas) == 1
     assert not db.scalars(select(Pedido)).all()
     formulario(boton="confirmar")
-    formulario(boton="entrega:recoger")
+    formulario(texto="recoger en el local")
     formulario(boton="pago:efectivo")
     assert db.scalars(select(Pedido)).one().total == 24000
 
@@ -218,7 +220,7 @@ def test_lista_del_resumen_no_cambia_pedido_registrado(db, formulario, medio):
     r = formulario(items=[{"producto": "copa_queso", "opciones": opciones}])
     viejo = next(b.id for b in r.botones if b.titulo == "Elegir de nuevo")
     formulario(boton="confirmar")
-    formulario(boton="entrega:recoger")
+    formulario(texto="recoger en el local")
     formulario(boton="pago:" + medio)
     antes = copy.deepcopy(formulario.conv().contexto_json)
     formulario(boton=viejo)
@@ -229,7 +231,7 @@ def test_lista_del_resumen_no_cambia_pedido_registrado(db, formulario, medio):
 def test_pago_verificado_durante_edicion_bloquea_seleccion(db, formulario):
     formulario(items=[{"producto": "granizado_lulo"}])
     formulario(boton="confirmar")
-    formulario(boton="entrega:recoger")
+    formulario(texto="recoger en el local")
     formulario(boton="pago:efectivo")
     formulario(boton="cambiar")
     r = formulario(items=[{"producto": "copa_queso"}])

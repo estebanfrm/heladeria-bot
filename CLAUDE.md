@@ -117,11 +117,11 @@ npx vitest run && npm run type-check && npx eslint . && npx prettier --check src
   5. ✅ Edición del mismo pedido antes de pago/despacho con reconfirmación y descarte;
      comprobante/pago/despacho bloquean cambios automáticos. Precios y cuentas desde la BD,
      sin descuentos inventados ni pagos declarados por texto; cantidades positivas y límites.
-  6. ✅ Suite actual: 255 tests del backend. Pruebas reales de recepción, respuestas y PDF
+  6. ✅ Suite actual: 263 tests del backend. Pruebas reales de recepción, respuestas y PDF
      confirmadas por el usuario; token de prueba y túnel temporal, todavía no producción.
-     Evaluación reproducible con IA real: `python -m app.ia.evaluar_robustez` (34 escenarios,
+     Evaluación reproducible con IA real: `python -m app.ia.evaluar_robustez` (35 escenarios,
      menú demo, BD heladeria_test, rollback, sin envío WhatsApp). Informes locales fuera de Git.
-     Resultado: 34/34, incluyendo copas por listas, corrección de salsa/sabor y micheladas.
+     Resultado: 35/35, incluyendo pago antes de dirección, copas por listas y micheladas.
      Informe `docs/PRUEBAS_ROBUSTEZ.md`.
      Modelo local actual `gemma4-heladeria:12b` (base gemma4:12b, num_ctx 4096, num_batch 64);
      servidor Ollama con LLAMA_ARG_CACHE_RAM=0 y LLAMA_ARG_CTX_CHECKPOINTS=0 por bad_alloc.
@@ -132,5 +132,7 @@ npx vitest run && npm run type-check && npx eslint . && npx prettier --check src
      WhatsApp permite elegir un sabor por paso, después salsa/topping, con páginas para
      los once sabores y «Elegir de nuevo». Cada toque valida el menú sin IA; un token
      del carrito invalida listas anteriores, reinicios y botones de otros chats.
+     Después de confirmar se pregunta solo el método de pago y luego dirección. Sin botón
+     ni sugerencias de recogida; botones antiguos ignorados, recogida por texto explícito.
   7. ⏭️ Siguiente: notificaciones al personal, comprobantes y estados del pedido;
      token permanente y registro del número real.

@@ -59,7 +59,7 @@ def test_conversacion_real_por_el_chat_web(db, api, falso, con_menu):
     assert r["respuestas"][0]["texto"].endswith("*Total: $24.000*")
 
     _enviar(api, falso, sesion=sesion, boton="confirmar")
-    _enviar(api, falso, sesion=sesion, boton="entrega:recoger")
+    _enviar(api, falso, sesion=sesion, texto="recoger en el local")
     r = _enviar(api, falso, sesion=sesion, boton="pago:efectivo")
     assert "Total a pagar al recogerlo: *$24.000*" in r["respuestas"][0]["texto"]
 
