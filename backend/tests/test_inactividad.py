@@ -1,6 +1,9 @@
 """Cierre, reapertura y temporizador con PostgreSQL y HTTP de WhatsApp sustituido."""
 
 import asyncio
+import hashlib
+import hmac
+import json
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -13,6 +16,7 @@ from app.canales.whatsapp_api import ErrorWhatsApp
 from app.config import settings
 from app.conversacion.inactividad import cerrar_si_inactiva
 from app.conversacion.motor import Entrada, Motor
+from app.dependencias import get_enviador_whatsapp, get_proveedor, get_sesiones
 from app.enums import Canal, EstadoPedido, ModoConversacion
 from app.enums import EstadoConversacion as E
 from app.ia.interpretacion import Interpretacion
@@ -126,6 +130,69 @@ def test_boton_de_otro_cierre_no_vacia_un_chat_nuevo(db, hilo):
     decir(motor, boton="chat:nuevo")
     assert conv.estado is E.DATOS_ENTREGA
     assert conv.contexto_json == antes
+
+
+@pytest.mark.parametrize("repetir_boton", [False, True])
+def test_nuevo_chat_por_webhook_envia_saludo_y_permite_repetir_boton(
+    db, hilo, monkeypatch, repetir_boton
+):
+    motor, conv = hilo
+    envejecer(db, conv, datetime.now(UTC) - timedelta(minutes=31))
+    cerrar_si_inactiva(db, conv)
+    db.commit()
+    sesiones = sessionmaker(bind=db.bind, join_transaction_mode="create_savepoint")
+    enviador = EnviadorPrueba()
+    monkeypatch.setattr(settings, "wa_app_secret", "secreto-prueba")
+    app.dependency_overrides[get_sesiones] = lambda: sesiones
+    app.dependency_overrides[get_proveedor] = lambda: motor.proveedor
+    app.dependency_overrides[get_enviador_whatsapp] = lambda: enviador
+    try:
+        with TestClient(app) as cliente:
+            for numero in range(2 if repetir_boton else 1):
+                cuerpo = json.dumps(
+                    {
+                        "entry": [
+                            {
+                                "changes": [
+                                    {
+                                        "value": {
+                                            "messages": [
+                                                {
+                                                    "from": conv.id_externo,
+                                                    "id": f"wamid.nuevo-chat-prueba-{numero}",
+                                                    "type": "interactive",
+                                                    "interactive": {
+                                                        "button_reply": {
+                                                            "id": "chat:nuevo",
+                                                            "title": "Nuevo chat",
+                                                        }
+                                                    },
+                                                }
+                                            ]
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ).encode()
+                firma = "sha256=" + hmac.new(b"secreto-prueba", cuerpo, hashlib.sha256).hexdigest()
+                respuesta = cliente.post(
+                    "/webhook/whatsapp",
+                    content=cuerpo,
+                    headers={"X-Hub-Signature-256": firma, "Content-Type": "application/json"},
+                )
+                assert respuesta.status_code == 200
+                assert respuesta.json() == {"recibidos": 1}
+        db.refresh(conv)
+        assert conv.estado is E.SALUDO and conv.modo is ModoConversacion.BOT
+        assert "carrito" not in conv.contexto_json
+        assert len(enviador.envios) == (2 if repetir_boton else 1)
+        assert all(r.texto.startswith("¡Hola!") for _, r in enviador.envios)
+        assert {b.id for b in enviador.envios[-1][1].botones} == {"menu", "pedir", "humano"}
+        assert motor.proveedor.llamadas == []
+    finally:
+        app.dependency_overrides.clear()
 
 
 @pytest.mark.parametrize("estado", [E.ESPERANDO_PAGO, E.PEDIDO_CONFIRMADO])

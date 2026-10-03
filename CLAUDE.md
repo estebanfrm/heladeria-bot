@@ -114,7 +114,17 @@ npx vitest run && npm run type-check && npx eslint . && npx prettier --check src
   4. ✅ Cierre por inactividad a los 30 minutos (`CHAT_INACTIVITY_MINUTES`): aviso y
      «Nuevo chat» para empezar sin el carrito anterior. Conserva pedidos e historial;
      `ESPERANDO_PAGO` conserva su plazo aparte. Temporizador en ambas entradas del servidor.
-  5. ✅ Suite actual: 145 tests del backend. Pruebas reales de recepción, respuestas y PDF
+  5. ✅ Edición del mismo pedido antes de pago/despacho con reconfirmación y descarte;
+     comprobante/pago/despacho bloquean cambios automáticos. Precios y cuentas desde la BD,
+     sin descuentos inventados ni pagos declarados por texto; cantidades positivas y límites.
+  6. ✅ Suite actual: 211 tests del backend. Pruebas reales de recepción, respuestas y PDF
      confirmadas por el usuario; token de prueba y túnel temporal, todavía no producción.
-  6. ⏭️ Siguiente: notificaciones al personal, comprobantes y estados del pedido;
+     Evaluación reproducible con IA real: `python -m app.ia.evaluar_robustez` (27 escenarios,
+     menú demo, BD heladeria_test, rollback, sin envío WhatsApp). Informes locales fuera de Git.
+     Resultado: 27/27 y regresión original 8/8. Informe `docs/PRUEBAS_ROBUSTEZ.md`.
+     Modelo local actual `gemma4-heladeria:12b` (base gemma4:12b, num_ctx 4096, num_batch 64);
+     servidor Ollama con LLAMA_ARG_CACHE_RAM=0 y LLAMA_ARG_CTX_CHECKPOINTS=0 por bad_alloc.
+     «Nuevo chat» probado también por webhook firmado y al repetir el botón. El token
+     temporal de Meta venció el 02/10 a las 20:00 (Cali); renovado en .env y servidor reiniciado.
+  7. ⏭️ Siguiente: notificaciones al personal, comprobantes y estados del pedido;
      token permanente y registro del número real.

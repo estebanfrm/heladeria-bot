@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.conversacion import mensajes
-from app.enums import Canal, EstadoConversacion, ModoConversacion, OrigenMensaje
-from app.models import Conversacion, Mensaje
+from app.enums import Canal, EstadoConversacion, EstadoPedido, ModoConversacion, OrigenMensaje
+from app.models import Conversacion, Mensaje, Pedido
 
 ESTADOS_CERRABLES = {
     EstadoConversacion.INICIO,
@@ -49,6 +49,10 @@ def cerrar_si_inactiva(
     """El llamador mantiene bloqueada la fila hasta commit; nunca cancela un pedido."""
     if conv.estado not in ESTADOS_CERRABLES:
         return False
+    if conv.contexto_json.get("edicion_pedido_id"):
+        pedido = db.get(Pedido, conv.contexto_json["edicion_pedido_id"])
+        if pedido and pedido.estado is EstadoPedido.PENDIENTE_PAGO:
+            return False  # el comprobante del pedido original sigue pudiendo llegar
     ahora = ahora or ahora_utc()
     if ahora - ultima_actividad(db, conv) < timedelta(minutes=settings.chat_inactivity_minutes):
         return False

@@ -5,8 +5,9 @@ con códigos del menú, sin precios. Aquí se valida todo y se calculan subtotal
 total con los precios del `Menu` (que viene de la BD).
 """
 
-from pydantic import BaseModel, Field, PositiveInt, computed_field
+from pydantic import BaseModel, Field, computed_field, field_validator
 
+from app.config import settings
 from app.enums import TipoEntrega, TipoGrupo
 from app.menu.schema import GrupoOpciones, Menu, Opcion, Producto
 
@@ -16,18 +17,29 @@ from app.menu.schema import GrupoOpciones, Menu, Opcion, Producto
 class AdicionalSolicitado(BaseModel):
     adicional: str  # código, ej. "topping_extra"
     opcion: str | None = None  # si el adicional exige elegir, ej. "oreo"
-    cantidad: PositiveInt = 1
+    cantidad: int = Field(default=1, ge=1, strict=True)
 
 
 class ItemSolicitado(BaseModel):
     """Un producto pedido. Campos extra (ej. un "precio" inventado por la IA) se ignoran."""
 
     producto: str  # código, ej. "copa_queso"
-    cantidad: PositiveInt = 1  # unidades idénticas; con otras opciones va en otro ítem
+    cantidad: int = Field(default=1, ge=1, strict=True)
     # Por tipo, en el orden dicho; pueden repetirse: {"sabor": ["brownie", "fresa", "brownie"]}
     opciones: dict[TipoGrupo, list[str]] = Field(default_factory=dict)
     adicionales: list[AdicionalSolicitado] = Field(default_factory=list)
-    notas: str = ""
+    notas: str = Field(default="", max_length=200)
+
+    @field_validator("opciones", mode="before")
+    @classmethod
+    def _opcion_unica_como_lista(cls, opciones):
+        """El mismo código suelto equivale a una lista de un elemento; no inventa opciones."""
+        if isinstance(opciones, dict):
+            return {
+                tipo: [valor] if isinstance(valor, str) else valor
+                for tipo, valor in opciones.items()
+            }
+        return opciones
 
 
 # --- Resultado de validar ---------------------------------------------------------
@@ -104,6 +116,29 @@ def validar_carrito(
     """Valida cada ítem y calcula los montos. El domicilio solo se cobra si `entrega` es
     DOMICILIO (antes de elegir la entrega se muestra el total sin domicilio)."""
     validados = [validar_item(menu, item) for item in items]
+    exceso = (
+        len(items) > settings.order_max_items
+        or sum(i.cantidad for i in items) > settings.order_max_units
+    )
+    if exceso and validados:
+        validados[0].problemas.append(
+            Problema(
+                codigo="limite_pedido",
+                mensaje=f"Para pedidos de más de {settings.order_max_units} unidades "
+                f"o {settings.order_max_items} productos distintos, habla con el equipo.",
+            )
+        )
+    if (
+        validados
+        and sum(i.cantidad * a.cantidad for i in items for a in i.adicionales)
+        > settings.order_max_units
+    ):
+        validados[0].problemas.append(
+            Problema(
+                codigo="limite_adicionales",
+                mensaje="Hay demasiados adicionales en el pedido. Consulta con el equipo.",
+            )
+        )
     subtotal = sum(i.total for i in validados)
     domicilio = menu.negocio.domicilio.costo if entrega is TipoEntrega.DOMICILIO else 0
     return ResultadoCarrito(
@@ -128,6 +163,13 @@ def validar_item(menu: Menu, item: ItemSolicitado) -> ItemValidado:
     resultado = ItemValidado(
         solicitud=item, nombre=producto.nombre, precio_unitario=producto.precio
     )
+    if sum(a.cantidad for a in item.adicionales) > settings.order_max_units:
+        resultado.problemas.append(
+            Problema(
+                codigo="limite_adicionales",
+                mensaje="Hay demasiados adicionales. Consulta con el equipo.",
+            )
+        )
     _validar_selecciones(producto, item, grupos, resultado)
     _validar_adicionales(menu, item, grupos, resultado)
     return resultado

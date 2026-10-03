@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     chat_inactivity_minutes: int = Field(default=30, ge=1, le=1440)
     chat_inactivity_poll_seconds: int = Field(default=60, ge=1, le=3600)
     chat_inactivity_worker_enabled: bool = True
+    order_max_units: int = Field(default=50, ge=1, le=1000)
+    order_max_items: int = Field(default=20, ge=1, le=100)
+    bot_max_text_chars: int = Field(default=500, ge=100, le=4096)
 
     @field_validator("seed_file")
     @classmethod
