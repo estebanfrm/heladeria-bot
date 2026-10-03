@@ -36,6 +36,9 @@ Reglas:
   su carrito completo actualizado. Si solo dice "quiero cambiar mi pedido", omite items.
 - Usa SOLO códigos del MENÚ. Si pide algo que no existe, pon como código lo que dijo
   (el sistema le avisará). Nunca cambies un producto por otro.
+- Si pide solo un ingrediente de una mezcla entre paréntesis (por ejemplo maracuyá
+  en "frutos amarillos (maracuyá y lulo)"), devuelve el ingrediente como opción,
+  sin sustituirlo por la mezcla. El código pedirá confirmar la mezcla explícitamente.
 - "items": si el mensaje agrega, cambia o completa productos, devuelve el carrito COMPLETO ya
   actualizado (CARRITO ACTUAL + cambios). Si el mensaje no toca el pedido, "items": null.
 - "opciones": agrupadas por tipo (sabor, salsa, topping, fruta, variante), solo con códigos del

@@ -162,6 +162,10 @@ class Motor:
             ]
 
         texto = normalizar(e.texto)
+        if conv.estado is E.COMPLETANDO_OPCIONES and texto in {"si", "si esa mezcla"}:
+            botones = mensajes.botones_mezcla(validar_carrito(menu, self._carrito(conv)))
+            if len(botones) == 1:
+                return self._confirmar_mezcla(conv, menu, botones[0].id)
         if texto in {"mantener pedido", "cancelar cambio", "dejar el pedido igual"}:
             return self._descartar_edicion(conv, menu)
         if conv.estado is E.PEDIDO_CONFIRMADO and (
@@ -256,6 +260,10 @@ class Motor:
                 return self._actualizar_carrito(conv, menu, self._carrito(conv))
         if i.items is not None:
             return self._actualizar_carrito(conv, menu, i.items)
+        if i.intencion is Intencion.CONFIRMAR and conv.estado is E.COMPLETANDO_OPCIONES:
+            botones = mensajes.botones_mezcla(validar_carrito(menu, self._carrito(conv)))
+            if len(botones) == 1:
+                return self._confirmar_mezcla(conv, menu, botones[0].id)
         if conv.estado is E.RESUMEN and (i.intencion is Intencion.CONFIRMAR or i.entrega):
             return self._confirmar(conv, menu)
         if conv.estado is E.DATOS_ENTREGA:
@@ -275,6 +283,8 @@ class Motor:
             return self._iniciar_edicion(conv, menu)
         if boton == "edicion:descartar":
             return self._descartar_edicion(conv, menu)
+        if boton.startswith("opcion:") and conv.estado is E.COMPLETANDO_OPCIONES:
+            return self._confirmar_mezcla(conv, menu, boton)
         if conv.estado is E.ESPERANDO_PAGO:
             return [mensajes.esperando_comprobante(conv.contexto_json["pedido_id"])]
         if boton == "menu":
@@ -314,6 +324,23 @@ class Motor:
         return self._paso_actual(conv, menu)
 
     # --- Pasos del pedido ----------------------------------------------------------
+
+    def _confirmar_mezcla(self, conv: Conversacion, menu: Menu, boton: str) -> list[Respuesta]:
+        items = self._carrito(conv)
+        resultado = validar_carrito(menu, items)
+        for indice, item in enumerate(resultado.items):
+            for problema in item.problemas:
+                if problema.codigo != "mezcla_por_confirmar":
+                    continue
+                esperado = f"opcion:{indice}:{problema.tipo.value}:{problema.opcion_sugerida}"
+                if boton == esperado:
+                    valores = items[indice].opciones[problema.tipo]
+                    items[indice].opciones[problema.tipo] = [
+                        problema.opcion_sugerida if v == problema.opcion_original else v
+                        for v in valores
+                    ]
+                    return self._actualizar_carrito(conv, menu, items)
+        return [mensajes.completar(resultado)]
 
     def _pedido_vigente(self, conv: Conversacion) -> Pedido | None:
         id_pedido = conv.contexto_json.get("edicion_pedido_id") or conv.contexto_json.get(

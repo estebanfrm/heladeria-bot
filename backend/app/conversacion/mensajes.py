@@ -116,7 +116,7 @@ def completar(resultado: ResultadoCarrito) -> Respuesta:
     pendientes = [item for item in resultado.items if item.faltantes]
     if not pendientes:
         lineas.append("\n¿Me ayudas a corregirlo?")
-        return Respuesta(texto="\n".join(lineas).strip())
+        return Respuesta(texto="\n".join(lineas).strip(), botones=botones_mezcla(resultado))
 
     lineas.append("\nPara completar tu pedido:" if lineas else "¡Listo! Para completar tu pedido:")
     for item in pendientes:
@@ -128,7 +128,20 @@ def completar(resultado: ResultadoCarrito) -> Respuesta:
             opciones = " / ".join(o.nombre.lower() for o in f.opciones)
             lineas.append(f"• {etiqueta} (elige {f.cantidad}): {opciones}")
     lineas.append("\nRespóndeme todo en un solo mensaje 🙌")
-    return Respuesta(texto="\n".join(lineas).strip())
+    return Respuesta(texto="\n".join(lineas).strip(), botones=botones_mezcla(resultado))
+
+
+def botones_mezcla(resultado: ResultadoCarrito) -> list[Boton]:
+    botones = {}
+    for indice, item in enumerate(resultado.items):
+        for problema in item.problemas:
+            if problema.codigo == "mezcla_por_confirmar":
+                codigo = problema.opcion_sugerida
+                id_boton = f"opcion:{indice}:{problema.tipo.value}:{codigo}"
+                botones[id_boton] = Boton(
+                    id=id_boton, titulo=f"{indice + 1}. {codigo.replace('_', ' ').capitalize()}"
+                )
+    return list(botones.values())
 
 
 def resumen(resultado: ResultadoCarrito) -> Respuesta:

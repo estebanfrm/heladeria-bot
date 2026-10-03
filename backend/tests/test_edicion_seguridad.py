@@ -368,3 +368,56 @@ def test_opcion_unica_en_texto_se_valida_con_el_menu_sin_inventar_opciones(db, b
     assert conv(db).estado is E.COMPLETANDO_OPCIONES
     bot(boton="confirmar")
     assert db.scalars(select(Pedido)).all() == []
+
+
+@pytest.mark.parametrize(
+    "ingrediente,mezcla",
+    [
+        ("maracuya", "frutos_amarillos"),
+        ("MARACUYÁ", "frutos_amarillos"),
+        ("lulo", "frutos_amarillos"),
+        ("fresa", "frutos_rojos"),
+        ("kiwi", "frutos_verdes"),
+    ],
+)
+def test_micheladas_piden_confirmar_la_mezcla_y_conservan_cinco_unidades(
+    db, bot, menu_demo, ingrediente, mezcla
+):
+    r = bot(
+        "todas " + ingrediente,
+        ia=pedir("michelada_soda", cantidad=5, opciones={"variante": [ingrediente]}),
+    )
+    assert "forma parte" in r[0].texto and "sabor individual" in r[0].texto
+    assert conv(db).estado is E.COMPLETANDO_OPCIONES
+    assert conv(db).contexto_json["carrito"][0]["opciones"]["variante"] == [ingrediente]
+    assert db.scalars(select(Pedido)).all() == []
+    r = bot(boton=r[0].botones[0].id)
+    assert conv(db).estado is E.RESUMEN
+    assert conv(db).contexto_json["carrito"][0]["opciones"]["variante"] == [mezcla]
+    assert conv(db).contexto_json["carrito"][0]["cantidad"] == 5
+    assert "5× Michelada" in r[0].texto
+    assert db.scalars(select(Pedido)).all() == []
+    bot(boton="confirmar")
+    bot(boton="entrega:recoger")
+    bot(boton="pago:efectivo")
+    pedido = db.scalar(select(Pedido))
+    assert pedido.total == menu_demo.producto("michelada_soda").precio * 5
+
+
+def test_michelada_si_confirma_solo_la_mezcla_no_registra_el_pedido(db, bot):
+    bot("maracuya", ia=pedir("michelada_soda", cantidad=5, opciones={"variante": ["maracuya"]}))
+    bot("sí")
+    assert conv(db).estado is E.RESUMEN
+    assert conv(db).contexto_json["carrito"][0]["opciones"]["variante"] == ["frutos_amarillos"]
+    assert db.scalars(select(Pedido)).all() == []
+
+
+def test_boton_de_mezcla_inventada_o_que_ya_no_aplica_no_modifica(db, bot):
+    bot("maracuya", ia=pedir("michelada_soda", opciones={"variante": ["maracuya"]}))
+    antes = copy.deepcopy(conv(db).contexto_json)
+    bot(boton="opcion:0:variante:frutos_verdes")
+    assert conv(db).contexto_json == antes
+    bot("lulo", ia=pedir())
+    antes = copy.deepcopy(conv(db).contexto_json)
+    bot(boton="opcion:0:variante:frutos_amarillos")
+    assert conv(db).contexto_json == antes

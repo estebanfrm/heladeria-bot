@@ -181,9 +181,15 @@ Las elecciones incompletas se preguntan y los productos inexistentes no se susti
 por otro. Una opción única que la IA entregue como texto se normaliza a una lista
 de un elemento y conserva la validación contra el menú.
 
+Para mezclas del menú, mencionar un ingrediente no selecciona automáticamente toda
+la mezcla. «Todas maracuya» en cinco micheladas ofrece confirmar «Frutos amarillos
+(maracuyá y lulo)» con un botón. «Sí» confirma esa propuesta si es única; luego se
+muestra el resumen con las cinco unidades. No se ofrecen mezclas agotadas ni se
+deduce una mezcla cuando varias comparten el mismo ingrediente.
+
 ### Evaluar mensajes con la IA real
 
-Desde `backend/`, `uv run python -m app.ia.evaluar_robustez` ejecuta 27 escenarios
+Desde `backend/`, `uv run python -m app.ia.evaluar_robustez` ejecuta 28 escenarios
 con el proveedor configurado. Usa siempre `seeds/demo.json`, clientes ficticios y
 transacciones revertidas en `heladeria_test`; no envía WhatsApp ni registra pedidos
 reales. Guarda mensajes, respuestas, JSON del modelo y resultados en
