@@ -162,6 +162,10 @@ class Motor:
             ]
 
         texto = normalizar(e.texto)
+        if conv.estado is E.COMPLETANDO_OPCIONES and texto in {"si", "si esa mezcla"}:
+            botones = mensajes.botones_mezcla(validar_carrito(menu, self._carrito(conv)))
+            if len(botones) == 1:
+                return self._confirmar_mezcla(conv, menu, botones[0].id)
         if texto in {"mantener pedido", "cancelar cambio", "dejar el pedido igual"}:
             return self._descartar_edicion(conv, menu)
         if conv.estado is E.PEDIDO_CONFIRMADO and (

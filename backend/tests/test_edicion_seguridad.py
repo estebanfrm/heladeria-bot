@@ -406,7 +406,7 @@ def test_micheladas_piden_confirmar_la_mezcla_y_conservan_cinco_unidades(
 
 def test_michelada_si_confirma_solo_la_mezcla_no_registra_el_pedido(db, bot):
     bot("maracuya", ia=pedir("michelada_soda", cantidad=5, opciones={"variante": ["maracuya"]}))
-    bot("sí", ia={"intencion": "confirmar"})
+    bot("sí")
     assert conv(db).estado is E.RESUMEN
     assert conv(db).contexto_json["carrito"][0]["opciones"]["variante"] == ["frutos_amarillos"]
     assert db.scalars(select(Pedido)).all() == []
