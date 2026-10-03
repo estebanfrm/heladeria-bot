@@ -23,6 +23,12 @@ SEED_DEMO = BACKEND.parent / "seeds" / "demo.json"
 URL_TEST = make_url(settings.database_url).set(database="heladeria_test")
 
 
+@pytest.fixture(autouse=True)
+def no_temporizador_real(monkeypatch):
+    """Los tests ejecutan ciclos explícitos con BD/enviador de prueba, nunca los reales."""
+    monkeypatch.setattr(settings, "chat_inactivity_worker_enabled", False)
+
+
 @pytest.fixture
 def menu_demo() -> Menu:
     """Menú de seeds/demo.json, recién leído (cada test puede modificarlo)."""

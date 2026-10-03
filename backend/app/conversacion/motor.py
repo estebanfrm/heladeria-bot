@@ -6,12 +6,15 @@ La IA solo interpreta: precios, validaciones, estados y pedidos los decide este 
 """
 
 import logging
+import re
 from dataclasses import dataclass
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.conversacion import mensajes
+from app.conversacion.inactividad import ahora_utc, cerrar_si_inactiva
 from app.conversacion.mensajes import Respuesta
 from app.enums import (
     Canal,
@@ -37,6 +40,31 @@ MAX_FALLOS = 2  # sin entender seguidos → pasa a una persona
 E = EstadoConversacion
 INACTIVOS = {E.INICIO, E.SALUDO, E.FIN, E.CANCELADA, E.PEDIDO_CONFIRMADO}
 
+# Direcciones inequívocas cuando se está pidiendo la entrega. No dependen de la IA.
+CALLE = (
+    r"(?:carrera|cra\.?|cr\.?|kr\.?|kra\.?|calle|cl\.?|cll\.?|avenida|av\.?|"
+    r"diagonal|diag\.?|dg\.?|transversal|transv\.?|tv\.?)\s*\d+[a-z]?"
+    r"(?:\s+bis)?(?:\s+(?:norte|sur|este|oeste))?"
+)
+COMPLEMENTO = (
+    r"(?:[ ,]+(?:apto\.?|apartamento|casa|barrio|torre|piso|interior|bloque)"
+    r"\s+[\w .,-]+)*"
+)
+DIRECCION = re.compile(
+    rf"{CALLE}(?:\s*(?:#|no\.?|número)\s*|\s+)"
+    rf"\d+[a-z]?(?:\s*[-–]\s*|\s+)\d+[a-z]?{COMPLEMENTO}",
+    re.IGNORECASE,
+)
+# Sin separador entre calle transversal y placa, se pide confirmar sin inventar números.
+DIRECCION_COMPACTA = re.compile(
+    rf"{CALLE}(?:\s*(?:#|no\.?|número)\s*|\s+)\d+[a-z]\d+{COMPLEMENTO}",
+    re.IGNORECASE,
+)
+INICIO_DIRECCION = re.compile(
+    rf"{CALLE}(?=\s|#|$)",
+    re.IGNORECASE,
+)
+
 
 @dataclass
 class Entrada:
@@ -58,6 +86,7 @@ class Motor:
 
     def procesar(self, entrada: Entrada) -> list[Respuesta]:
         conv = self._conversacion(entrada)
+        cerrar_si_inactiva(self.session, conv, registrar_aviso=False)
         self._guardar(
             conv,
             OrigenMensaje.CLIENTE,
@@ -65,7 +94,32 @@ class Motor:
             entrada.media_url,
             entrada.id_mensaje,
         )
-        if conv.modo is ModoConversacion.HUMANO:
+        if conv.estado is E.CANCELADA:
+            if entrada.boton == "chat:nuevo" or entrada.texto.strip().lower() in {
+                "nuevo chat",
+                "nuevo pedido",
+                "iniciar chat",
+                "empezar de nuevo",
+            }:
+                conv.contexto_json = {"sesion_iniciada_en": ahora_utc().isoformat()}
+                conv.estado = E.SALUDO
+                conv.modo = ModoConversacion.BOT
+                respuestas = [mensajes.saludo(leer_menu(self.session))]
+            else:
+                conv.contexto_json["aviso_cierre_pendiente"] = False
+                respuestas = [
+                    mensajes.chat_cerrado(
+                        conv.contexto_json.get("minutos_cierre", settings.chat_inactivity_minutes)
+                    )
+                ]
+        elif conv.modo is ModoConversacion.HUMANO and entrada.texto.strip().lower() in {
+            "bot",
+            "volver al bot",
+        }:
+            conv.modo = ModoConversacion.BOT
+            conv.contexto_json["fallos"] = 0
+            respuestas = self._paso_actual(conv, leer_menu(self.session))
+        elif conv.modo is ModoConversacion.HUMANO:
             respuestas = []  # la atiende una persona (panel, Fase 3)
         else:
             respuestas = self._responder(conv, leer_menu(self.session), entrada)
@@ -83,6 +137,42 @@ class Motor:
             return self._comprobante(conv, e.media_url)
         if not e.texto.strip():
             return [mensajes.solo_texto()]
+
+        if e.texto.strip().lower() in {"menu", "menú", "ver menu", "ver menú"}:
+            return self._carta(conv, menu)
+        if conv.estado is E.DATOS_ENTREGA:
+            direccion = e.texto.strip()
+            if conv.contexto_json.get("direccion_por_confirmar") and direccion.lower() in {
+                "sí",
+                "si",
+                "confirmar",
+                "sí, esa dirección",
+            }:
+                return self._boton(conv, menu, "direccion:confirmar")
+            if DIRECCION.fullmatch(direccion):
+                conv.contexto_json["fallos"] = 0
+                conv.contexto_json.pop("direccion_por_confirmar", None)
+                conv.contexto_json["entrega"] = self._entrega(
+                    conv, DatosEntrega(direccion=direccion)
+                ).model_dump(mode="json")
+                return self._datos_entrega(conv, menu)
+            if DIRECCION_COMPACTA.fullmatch(direccion):
+                conv.contexto_json["fallos"] = 0
+                conv.contexto_json["direccion_por_confirmar"] = direccion
+                return [mensajes.confirmar_direccion(direccion)]
+            if re.fullmatch(CALLE, direccion, re.IGNORECASE):
+                conv.contexto_json["fallos"] = 0
+                conv.contexto_json.pop("direccion_por_confirmar", None)
+                return [
+                    Respuesta(
+                        texto="Me falta el número de la dirección. "
+                        "Escríbela completa, por ejemplo: «Cra 8 #80-70»."
+                    )
+                ]
+            if INICIO_DIRECCION.match(direccion):
+                conv.contexto_json["fallos"] = 0
+                conv.contexto_json.pop("direccion_por_confirmar", None)
+                return [mensajes.aclarar_direccion()]
 
         try:
             interp = interpretar(self.proveedor, menu, e.texto, self._carrito(conv), conv.estado)
@@ -120,6 +210,10 @@ class Motor:
         return self._paso_actual(conv, menu)
 
     def _boton(self, conv: Conversacion, menu: Menu, boton: str) -> list[Respuesta]:
+        if boton == "chat:nuevo":
+            return self._paso_actual(
+                conv, menu
+            )  # botón de un cierre anterior: no vacía otro pedido
         if boton == "humano":
             return self._a_humano(conv)
         if conv.estado is E.ESPERANDO_PAGO:
@@ -139,9 +233,18 @@ class Motor:
                 )
                 return [Respuesta(texto=pregunta)]
         if conv.estado is E.DATOS_ENTREGA:
-            if boton.startswith("pago:"):
+            if boton == "direccion:confirmar":
+                direccion = conv.contexto_json.pop("direccion_por_confirmar", None)
+                if not direccion:
+                    return self._paso_actual(conv, menu)
+                datos = DatosEntrega(direccion=direccion)
+            elif boton == "direccion:corregir":
+                conv.contexto_json.pop("direccion_por_confirmar", None)
+                return [mensajes.aclarar_direccion()]
+            elif boton.startswith("pago:"):
                 datos = DatosEntrega(medio_pago=boton.removeprefix("pago:"))
             elif boton == "entrega:recoger":
+                conv.contexto_json.pop("direccion_por_confirmar", None)
                 datos = DatosEntrega(tipo=TipoEntrega.RECOGER)
             else:
                 return self._paso_actual(conv, menu)
@@ -154,11 +257,16 @@ class Motor:
     def _carta(self, conv: Conversacion, menu: Menu) -> list[Respuesta]:
         if conv.estado in INACTIVOS:
             conv.estado = E.TOMANDO_PEDIDO
-        return [mensajes.carta(menu)]
+        return [
+            mensajes.carta(
+                menu, pdf=conv.canal is Canal.WHATSAPP and settings.wa_menu_pdf_file is not None
+            )
+        ]
 
     def _actualizar_carrito(
         self, conv: Conversacion, menu: Menu, items: list[ItemSolicitado]
     ) -> list[Respuesta]:
+        conv.contexto_json.pop("direccion_por_confirmar", None)
         conv.contexto_json["carrito"] = [i.model_dump(mode="json") for i in items]
         if not items:
             conv.estado = E.TOMANDO_PEDIDO
@@ -187,6 +295,8 @@ class Motor:
             entrega.medio_pago = None
             conv.contexto_json["entrega"] = entrega.model_dump(mode="json")
         falta_direccion = entrega.tipo is not TipoEntrega.RECOGER and not entrega.direccion
+        if falta_direccion and conv.contexto_json.get("direccion_por_confirmar"):
+            return [mensajes.confirmar_direccion(conv.contexto_json["direccion_por_confirmar"])]
         if aviso or falta_direccion or entrega.medio_pago is None:
             return [mensajes.pedir_entrega(menu, entrega, aviso)]
 
@@ -207,6 +317,7 @@ class Motor:
         )
         if entrega.direccion:
             conv.cliente.ultima_direccion = entrega.direccion
+        conv.contexto_json.pop("direccion_por_confirmar", None)
         conv.contexto_json.update(carrito=[], entrega={}, pedido_id=pedido.id)
 
         if medio.requiere_comprobante:
@@ -227,6 +338,7 @@ class Motor:
         if conv.estado is E.ESPERANDO_PAGO:
             pedido = self.session.get(Pedido, conv.contexto_json["pedido_id"])
             pedido.estado = EstadoPedido.CANCELADO
+        conv.contexto_json.pop("direccion_por_confirmar", None)
         conv.contexto_json.update(carrito=[], entrega={})
         conv.estado = E.FIN
         return [mensajes.cancelado()]
@@ -253,6 +365,14 @@ class Motor:
     # --- Fallos y paso a humano -----------------------------------------------------
 
     def _fallo(self, conv: Conversacion) -> list[Respuesta]:
+        if conv.estado is E.DATOS_ENTREGA:
+            conv.contexto_json["fallos"] = 0
+            entrega = DatosEntrega.model_validate(conv.contexto_json.get("entrega", {}))
+            if entrega.direccion or entrega.tipo is TipoEntrega.RECOGER:
+                return self._paso_actual(conv, leer_menu(self.session))
+            if conv.contexto_json.get("direccion_por_confirmar"):
+                return [mensajes.confirmar_direccion(conv.contexto_json["direccion_por_confirmar"])]
+            return [mensajes.aclarar_direccion()]
         fallos = conv.contexto_json.get("fallos", 0) + 1
         conv.contexto_json["fallos"] = fallos
         if fallos >= MAX_FALLOS:
@@ -268,9 +388,9 @@ class Motor:
 
     def _conversacion(self, e: Entrada) -> Conversacion:
         conv = self.session.scalar(
-            select(Conversacion).where(
-                Conversacion.canal == e.canal, Conversacion.id_externo == e.id_externo
-            )
+            select(Conversacion)
+            .where(Conversacion.canal == e.canal, Conversacion.id_externo == e.id_externo)
+            .with_for_update()
         )
         if conv is not None:
             return conv

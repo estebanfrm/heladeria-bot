@@ -6,6 +6,7 @@ La IA es un ProveedorFalso con respuestas guionadas; todo lo demás es real (BD,
 import pytest
 from sqlalchemy import func, select
 
+from app.config import settings
 from app.conversacion.motor import Entrada, Motor
 from app.enums import Canal, EstadoConversacion, EstadoPedido, ModoConversacion, TipoEntrega
 from app.ia.casos import CASOS, PEDIDO_COMPLETO
@@ -21,9 +22,10 @@ E = EstadoConversacion
 
 
 @pytest.fixture
-def chat(db, menu_demo):
+def chat(db, menu_demo, monkeypatch):
     """chat(texto, ia=..., boton=..., media=...) → respuestas del bot."""
     aplicar_menu(db, menu_demo)
+    monkeypatch.setattr(settings, "wa_menu_pdf_file", None)
     falso = ProveedorFalso([])
     motor = Motor(db, falso)
 
@@ -251,7 +253,7 @@ def test_entender_reinicia_los_fallos(db, chat):
 
 def test_pedir_humano_con_boton(db, chat):
     r = chat(boton="humano")
-    assert "Te comunico con una persona" in r[0].texto
+    assert "pendiente de atención de una persona" in r[0].texto
     assert _conv(db).modo is ModoConversacion.HUMANO
 
 
@@ -271,7 +273,7 @@ def test_cancelar_despues_del_comprobante_lo_decide_una_persona(db, chat):
 
     r = chat("cancela todo", ia=_pedir(Intencion.CANCELAR))
 
-    assert "Te comunico con una persona" in r[0].texto
+    assert "pendiente de atención de una persona" in r[0].texto
     assert db.scalars(select(Pedido)).one().estado is EstadoPedido.PENDIENTE_PAGO
 
 
@@ -308,3 +310,136 @@ def test_chat_web_y_whatsapp_son_conversaciones_distintas(db, chat):
     assert web.canal is Canal.WEB and web.cliente.telefono is None
     assert _conv(db).cliente.telefono == WA
     assert web.cliente_id != _conv(db).cliente_id
+
+
+@pytest.mark.parametrize("entrada", [{"boton": "menu"}, {"texto": "menú"}])
+def test_menu_pdf_solo_en_whatsapp(chat, monkeypatch, tmp_path, entrada):
+    monkeypatch.setattr(settings, "wa_menu_pdf_file", tmp_path / "menu.pdf")
+    r = chat(**entrada)
+    assert r[0].documento == "menu"
+    assert "• Copa queso" not in r[0].texto
+    web = chat(**entrada, canal=Canal.WEB, id_externo="sesion-pdf")
+    assert web[0].documento is None
+    assert "• Copa queso" in web[0].texto
+
+
+def test_direccion_del_chat_no_depende_de_ia_y_conserva_efectivo(db, chat):
+    chat("granizado de lulo", ia=_pedir(items=[ItemSolicitado(producto="granizado_lulo")]))
+    chat(boton="confirmar")
+    chat(boton="pago:efectivo")
+    llamadas = len(chat.falso.llamadas)
+    r = chat("Cra 8")
+    assert "Me falta el número" in r[0].texto
+    assert _conv(db).modo is ModoConversacion.BOT
+    assert _conv(db).contexto_json.get("fallos", 0) == 0
+    assert db.scalars(select(Pedido)).all() == []
+    r = chat("Cra 8 #80-70")
+    assert "ya está en preparación" in r[0].texto
+    pedido = db.scalars(select(Pedido)).one()
+    assert pedido.direccion == "Cra 8 #80-70"
+    assert pedido.tipo_entrega is TipoEntrega.DOMICILIO
+    assert pedido.medio_pago.codigo == "efectivo"
+    assert pedido.total == 8000
+    assert len(chat.falso.llamadas) == llamadas
+
+
+def test_volver_al_bot_conserva_carrito_y_pago(db, chat):
+    _hasta_resumen(chat)
+    chat(boton="confirmar")
+    chat(boton="pago:efectivo")
+    antes = dict(_conv(db).contexto_json)
+    chat(boton="humano")
+    assert chat("¿hola?") == []
+    r = chat("bot")
+    assert "¿A qué dirección" in r[0].texto
+    assert _conv(db).modo is ModoConversacion.BOT
+    assert _conv(db).contexto_json["carrito"] == antes["carrito"]
+    assert _conv(db).contexto_json["entrega"] == antes["entrega"]
+
+
+@pytest.mark.parametrize("confirmacion", [{"boton": "direccion:confirmar"}, {"texto": "sí"}])
+def test_direccion_compacta_del_chat_se_confirma_sin_ia(db, chat, confirmacion):
+    _hasta_resumen(chat)
+    chat(boton="confirmar")
+    chat(boton="pago:efectivo")
+    llamadas = len(chat.falso.llamadas)
+    r = chat("CRA 40 96a02")
+    assert "CRA 40 96a02" in r[0].texto
+    assert [b.id for b in r[0].botones] == ["direccion:confirmar", "direccion:corregir"]
+    assert _conv(db).contexto_json["entrega"]["direccion"] is None
+    assert db.scalars(select(Pedido)).all() == []
+    chat(**confirmacion)
+    pedido = db.scalars(select(Pedido)).one()
+    assert pedido.direccion == "CRA 40 96a02"
+    assert pedido.medio_pago.codigo == "efectivo"
+    assert pedido.total == 24000
+    assert "direccion_por_confirmar" not in _conv(db).contexto_json
+    assert len(chat.falso.llamadas) == llamadas
+
+
+@pytest.mark.parametrize(
+    "direccion",
+    [
+        "CRA 40 #96A-02",
+        "Cra. 40 96a 02",
+        "Carrera 40 96A–02 apartamento 301",
+        "Calle 96A #40-02, barrio El Caney",
+        "CRA 40 96a02",
+    ],
+)
+def test_corregir_direccion_compacta_y_aceptar_variantes(db, chat, direccion):
+    _hasta_resumen(chat)
+    chat(boton="confirmar")
+    chat(boton="pago:efectivo")
+    llamadas = len(chat.falso.llamadas)
+    chat("CRA 40 96a02")
+    r = chat(boton="direccion:corregir")
+    assert "dirección completa" in r[0].texto
+    assert "direccion_por_confirmar" not in _conv(db).contexto_json
+    chat(direccion)
+    if _conv(db).contexto_json.get("direccion_por_confirmar"):
+        chat(boton="direccion:confirmar")
+    assert db.scalars(select(Pedido)).one().direccion == direccion
+    assert len(chat.falso.llamadas) == llamadas
+
+
+@pytest.mark.parametrize("direccion", ["CRA 40", "CRA 40 9602", "CRA 40 #96A-"])
+def test_direccion_incompleta_pide_aclarar_sin_humano_ni_pedido(db, chat, direccion):
+    _hasta_resumen(chat)
+    chat(boton="confirmar")
+    chat(boton="pago:efectivo")
+    llamadas = len(chat.falso.llamadas)
+    for _ in range(3):
+        r = chat(direccion)
+        assert "dirección" in r[0].texto
+    assert _conv(db).modo is ModoConversacion.BOT
+    assert _conv(db).contexto_json["fallos"] == 0
+    assert db.scalars(select(Pedido)).all() == []
+    assert len(chat.falso.llamadas) == llamadas
+
+
+def test_ia_invalida_en_entrega_pide_direccion_sin_perder_carrito(db, chat):
+    _hasta_resumen(chat)
+    chat(boton="confirmar")
+    chat(boton="pago:efectivo")
+    carrito = _conv(db).contexto_json["carrito"]
+    for _ in range(2):
+        r = chat("mi casa queda detrás del parque", ia='{"entrega": {}}')
+        assert "dirección completa" in r[0].texto
+        assert "copa queso" not in r[0].texto
+    assert _conv(db).modo is ModoConversacion.BOT
+    assert _conv(db).contexto_json["carrito"] == carrito
+    assert _conv(db).contexto_json["entrega"]["medio_pago"] == "efectivo"
+    assert db.scalars(select(Pedido)).all() == []
+
+
+def test_recoger_descarta_direccion_sin_confirmar(db, chat):
+    _hasta_resumen(chat)
+    chat(boton="confirmar")
+    chat(boton="pago:efectivo")
+    chat("CRA 40 96a02")
+    chat(boton="entrega:recoger")
+    pedido = db.scalars(select(Pedido)).one()
+    assert pedido.tipo_entrega is TipoEntrega.RECOGER
+    assert pedido.direccion is None
+    assert "direccion_por_confirmar" not in _conv(db).contexto_json

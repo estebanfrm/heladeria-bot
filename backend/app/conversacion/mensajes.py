@@ -4,6 +4,8 @@ Funciones puras: reciben datos ya calculados por el código (precios, totales, f
 y solo los formatean. Los botones son genéricos; cada canal decide cómo mostrarlos.
 """
 
+from typing import Literal
+
 from pydantic import BaseModel
 
 from app.enums import EstadoPedido, TipoEntrega
@@ -20,6 +22,7 @@ class Boton(BaseModel):
 class Respuesta(BaseModel):
     texto: str
     botones: list[Boton] = []
+    documento: Literal["menu"] | None = None
 
 
 BOTONES_INICIO = [
@@ -60,6 +63,15 @@ def saludo(menu: Menu) -> Respuesta:
     )
 
 
+def chat_cerrado(minutos: int) -> Respuesta:
+    return Respuesta(
+        texto=f"Cerré esta conversación tras {minutos} minutos sin respuesta. "
+        "Si quieres volver a pedir, pulsa «Nuevo chat» o escribe «nuevo chat». "
+        "Los pedidos ya registrados se conservan.",
+        botones=[Boton(id="chat:nuevo", titulo="Nuevo chat")],
+    )
+
+
 def pedir_texto() -> Respuesta:
     return Respuesta(
         texto="¡Dale! Escríbeme lo que quieres, por ejemplo: "
@@ -67,7 +79,12 @@ def pedir_texto() -> Respuesta:
     )
 
 
-def carta(menu: Menu) -> Respuesta:
+def carta(menu: Menu, *, pdf: bool = False) -> Respuesta:
+    if pdf:
+        return Respuesta(
+            texto="🍦 Aquí tienes nuestro menú. Escríbeme lo que quieres pedir 😋",
+            documento="menu",
+        )
     lineas = [f"🍦 *Menú de {menu.negocio.nombre}*"]
     for categoria in sorted(menu.categorias, key=lambda c: c.orden):
         productos = [p for p in menu.productos if p.categoria == categoria.id]
@@ -149,6 +166,24 @@ def pedir_entrega(menu: Menu, entrega: DatosEntrega, aviso: str | None = None) -
     return Respuesta(texto=f"{aviso}\n{texto}" if aviso else texto, botones=botones)
 
 
+def confirmar_direccion(direccion: str) -> Respuesta:
+    return Respuesta(
+        texto=f"Recibí esta dirección: {direccion}\n¿La confirmas para el domicilio?",
+        botones=[
+            Boton(id="direccion:confirmar", titulo="Sí, esa dirección"),
+            Boton(id="direccion:corregir", titulo="Corregir dirección"),
+        ],
+    )
+
+
+def aclarar_direccion() -> Respuesta:
+    return Respuesta(
+        texto="Necesito la dirección completa para el domicilio: vía, número y placa. "
+        "Por ejemplo: «Cra 40 #96A-02». Puedes añadir apartamento y barrio.",
+        botones=[Boton(id="entrega:recoger", titulo="Recoger en el local")],
+    )
+
+
 def pagar_transferencia(pedido_id: int, medio: MedioPago, total: int) -> Respuesta:
     return Respuesta(
         texto=(
@@ -204,7 +239,8 @@ def no_entendi() -> Respuesta:
 def a_humano(por_fallos: bool = False) -> Respuesta:
     inicio = "Parece que no te estoy entendiendo 😅 " if por_fallos else ""
     return Respuesta(
-        texto=f"{inicio}Te comunico con una persona del equipo 🙋 En un momento te escriben."
+        texto=f"{inicio}El chat queda pendiente de atención de una persona del equipo 🙋. "
+        "Las respuestas automáticas están pausadas. Escribe «bot» para retomarlas."
     )
 
 

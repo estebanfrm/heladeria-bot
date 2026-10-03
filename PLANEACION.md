@@ -304,7 +304,8 @@ INICIO
             PEDIDO_CONFIRMADO ──► (WhatsApp personal o panel) EN_PREPARACION ──► ENVIADO ──► FIN
 
   En cualquier estado:  "asesor"/2 fallos → HUMANO (bot se pausa)
-                        inactividad 30 min → recordatorio → cancelado
+                        inactividad 30 min → chat cerrado → «Nuevo chat» → SALUDO
+                        (ESPERANDO_PAGO conserva su propio plazo de pago)
 ```
 
 ### Ejemplo de conversación objetivo
@@ -591,8 +592,14 @@ WEB_CHAT_MAX_MSGS_PER_SESSION=20
 
 ### Fase 2 — Canales
 - [x] Chat web (widget Vue) contra `/chat` — `frontend/`: página de demo + widget (Vue 3, Vite, TS, Pinia, Tailwind 4); CORS por `CORS_ORIGINS`; probado de punta a punta con Ollama (pedido de $24.000)
-- [ ] Configurar app en Meta for Developers + número de prueba
-- [ ] Webhook de WhatsApp (verificación, firma, recepción, envío)
+- [x] Configurar app en Meta for Developers + número de prueba
+- [x] Webhook de WhatsApp (verificación, firma, recepción, envío)
+  - [x] Preparar entrada de túnel limitada al webhook (`app.whatsapp_demo`, puerto 8001), verificar desafío/firma y bloquear los demás endpoints.
+  - [x] Conectar el túnel HTTPS temporal con Meta, guardar el webhook y suscribir `messages` v26.0. Credenciales completas en `.env`; cuenta de prueba vinculada mediante `subscribed_apps`; Graph API y firma HMAC comprobadas. Recepción y respuesta reales confirmadas por el usuario el 02/10/2026, con mensajes registrados en la BD. Funciona con el número de prueba; token temporal y túnel local, no producción.
+- [x] Menú PDF en WhatsApp configurado con `WA_MENU_PDF_FILE`: subida a Meta, envío como documento y reutilización del medio; el chat web conserva el texto.
+- [x] Corregir el caso real de dirección «Cra 8 #80-70»: reconocimiento directo en entrega, solicitud de número si está incompleta y comando «bot» para recuperar el carrito desde modo humano. Pruebas: 118 aprobadas.
+- [x] Ampliar direcciones al caso «CRA 40 96a02»: confirmación del formato compacto sin inventar separadores, variantes con espacios, corrección/recogida y aclaraciones de entrega ante fallos de IA sin perder carrito ni pasar a humano. Pruebas: 130 aprobadas.
+- [x] Cierre por inactividad a los 30 minutos configurables: temporizador persistente, aviso con «Nuevo chat», reapertura voluntaria sin carrito anterior, historial/pedidos conservados y protección de comprobantes pendientes. También comprueba vencimiento tras reiniciar el servidor; bloqueos y avisos pendientes coordinan los procesos. Pruebas: 145 aprobadas.
 - [ ] Mensajes interactivos (listas y botones)
 - [ ] Notificación de pedidos al personal (resumen + comprobante + botones de estado)
 - [ ] Comando "turno" para abrir la ventana de 24 h del personal

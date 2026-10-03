@@ -107,5 +107,14 @@ npx vitest run && npm run type-check && npx eslint . && npx prettier --check src
   6. ✅ Endpoint `POST /chat` (canal web). 95 tests.
 - 🔄 **Fase 2 — Canales** (sección 11 de `PLANEACION.md`):
   1. ✅ Chat web: `frontend/` (página de demo + widget) contra `/chat`; CORS por `CORS_ORIGINS`.
-  2. ⏭️ **Siguiente:** WhatsApp Cloud API. Esteban ya creó la cuenta de Meta for Developers; falta la app,
-     el número de prueba y el webhook (exponer local con Cloudflare Tunnel).
+  2. ✅ WhatsApp Cloud API con número de prueba: webhook firmado, mensajes y botones;
+     entrada `app.whatsapp_demo` en puerto 8001 para el túnel temporal de Cloudflare.
+  3. ✅ Menú PDF configurable con `WA_MENU_PDF_FILE` (archivo local privado, fuera de Git),
+     reconocimiento de direcciones y confirmación de formatos compactos.
+  4. ✅ Cierre por inactividad a los 30 minutos (`CHAT_INACTIVITY_MINUTES`): aviso y
+     «Nuevo chat» para empezar sin el carrito anterior. Conserva pedidos e historial;
+     `ESPERANDO_PAGO` conserva su plazo aparte. Temporizador en ambas entradas del servidor.
+  5. ✅ Suite actual: 145 tests del backend. Pruebas reales de recepción, respuestas y PDF
+     confirmadas por el usuario; token de prueba y túnel temporal, todavía no producción.
+  6. ⏭️ Siguiente: notificaciones al personal, comprobantes y estados del pedido;
+     token permanente y registro del número real.
