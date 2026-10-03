@@ -17,7 +17,7 @@ from app.ia.proveedores import (
     crear_proveedor,
 )
 from app.ia.servicio import RespuestaIAInvalida, interpretar, leer_respuesta
-from app.pedidos.carrito import validar_carrito
+from app.pedidos.carrito import ItemSolicitado, validar_carrito
 
 # --- Prompt -------------------------------------------------------------------------
 
@@ -51,6 +51,28 @@ def test_prompt_incluye_estado_carrito_y_lo_que_falta(menu_demo):
 
 
 # --- Leer la respuesta ------------------------------------------------------------
+
+
+def test_prompt_corrige_carrito_anterior_sin_arrastrar_salsa_como_sabor(menu_demo):
+    original = ItemSolicitado(
+        producto="copa_queso",
+        opciones={
+            "sabor": ["vainilla", "frutos_rojos"],
+            "salsa": ["frutos_rojos"],
+            "topping": ["oreo"],
+        },
+    )
+    _, usuario = construir_prompt(
+        menu_demo, "Salsa frutos rojos", [original], EstadoConversacion.COMPLETANDO_OPCIONES
+    )
+    carrito = json.loads(usuario.split("CARRITO ACTUAL: ")[1].split("\n")[0])
+    assert carrito[0]["opciones"] == {
+        "sabor": ["vainilla"],
+        "salsa": ["frutos_rojos"],
+        "topping": ["oreo"],
+    }
+    assert "Copa queso: sabor de helado ×1" in usuario
+    assert original.opciones["sabor"] == ["vainilla", "frutos_rojos"]
 
 
 def test_lee_json_aunque_venga_en_bloque_de_codigo():

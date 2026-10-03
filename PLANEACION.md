@@ -591,6 +591,7 @@ WEB_CHAT_MAX_MSGS_PER_SESSION=20
 - [x] Endpoint de prueba `/chat` + pruebas con pytest usando los mensajes del chat real (`app/canales/web.py`: límite de mensajes por sesión, 500 caracteres, sin IA configurada siguen los botones)
 
 ### Fase 2 — Canales
+- [x] Selección guiada en WhatsApp: un sabor por paso, luego salsa/topping y opciones de adicionales. Páginas para los once sabores, elecciones conservadas, reinicio antes de confirmar, validación de disponibilidad/repeticiones y listas anteriores sin efecto. Corrección del caso «Vainilla frutos rojos oreo» sin inventar un segundo sabor ni arrastrar grupos incorrectos. Suite: 255 pruebas y 34/34 escenarios con IA real.
 - [x] Ingredientes de mezclas en micheladas: «maracuya» ofrece confirmar «frutos amarillos (maracuyá y lulo)» sin seleccionar la mezcla automáticamente. Botón o «sí» con propuesta única; cantidades conservadas, mezcla agotada/ambigua rechazada y botones antiguos sin efecto. Suite: 220 pruebas aprobadas.
 - [x] Diagnóstico de «Nuevo chat» sin saludo: webhook y reapertura correctos, pero token temporal expirado en Meta (190/463). Renovado el token privado y reiniciado el servidor; añadidas pruebas de reapertura completa por webhook firmado y repetición del botón. Suite actual: 211 aprobadas.
 - [x] Edición del mismo pedido antes del pago/despacho: nuevo resumen y reconfirmación, conservación del número, descarte voluntario de cambios, control del estado al guardar y bloqueo al recibir comprobante. Precios y medios de pago siempre desde el menú. Protecciones contra descuentos inventados, roles falsos, cantidades inválidas/excesivas y JSON adversario. Suite: 209 pruebas aprobadas; 27/27 escenarios con la IA local y 8/8 casos originales. Activado en el bot de prueba. Informe: `docs/PRUEBAS_ROBUSTEZ.md`.
@@ -603,7 +604,7 @@ WEB_CHAT_MAX_MSGS_PER_SESSION=20
 - [x] Corregir el caso real de dirección «Cra 8 #80-70»: reconocimiento directo en entrega, solicitud de número si está incompleta y comando «bot» para recuperar el carrito desde modo humano. Pruebas: 118 aprobadas.
 - [x] Ampliar direcciones al caso «CRA 40 96a02»: confirmación del formato compacto sin inventar separadores, variantes con espacios, corrección/recogida y aclaraciones de entrega ante fallos de IA sin perder carrito ni pasar a humano. Pruebas: 130 aprobadas.
 - [x] Cierre por inactividad a los 30 minutos configurables: temporizador persistente, aviso con «Nuevo chat», reapertura voluntaria sin carrito anterior, historial/pedidos conservados y protección de comprobantes pendientes. También comprueba vencimiento tras reiniciar el servidor; bloqueos y avisos pendientes coordinan los procesos. Pruebas: 145 aprobadas.
-- [ ] Mensajes interactivos (listas y botones)
+- [x] Mensajes interactivos (listas y botones): selección guiada, paginación y respuestas de lista procesadas directamente sin IA.
 - [ ] Notificación de pedidos al personal (resumen + comprobante + botones de estado)
 - [ ] Comando "turno" para abrir la ventana de 24 h del personal
 - [ ] Pago nivel 1: enviar cuenta + monto según medio elegido, recibir comprobante, reenviarlo al personal con botones

@@ -37,7 +37,36 @@ class Caso:
 
 
 CASOS = [
+    Caso("copa_por_listas", "una copa queso", "formulario", "copa_queso"),
     Caso("michelada_maracuya", "Todas maracuya", "mezcla", "michelada_soda", 5),
+    Caso(
+        "copa_sin_etiquetas", "Vainilla frutos rojos oreo triturado", "opciones_copa", "copa_queso"
+    ),
+    Caso(
+        "copa_saltos_linea", "Vainilla\nfrutos rojos\noreo triturado", "opciones_copa", "copa_queso"
+    ),
+    Caso(
+        "copa_corregir_anterior",
+        "Sabor Vainilla\nSalsa frutos rojos\nToping oreo triturado",
+        "opciones_copa_corruptas",
+        "copa_queso",
+    ),
+    Caso(
+        "copa_yogurt_frutos_rojos",
+        "una copa queso con helados vainilla y yogurt frutos rojos, salsa lecherita y oreo",
+        producto="copa_queso",
+        opciones={
+            "sabor": ["vainilla", "yogurt_frutos_rojos"],
+            "salsa": ["lecherita"],
+            "topping": ["oreo"],
+        },
+    ),
+    Caso(
+        "copa_maracuya_en_dos_grupos",
+        "una copa queso helados vainilla y maracuya, salsa maracuya, topping oreo",
+        producto="copa_queso",
+        opciones={"sabor": ["vainilla", "maracuya"], "salsa": ["maracuya"], "topping": ["oreo"]},
+    ),
     Caso("granizado_correcto", "quiero un granizado de lulo"),
     Caso("granisado", "un granisado de lulo"),
     Caso("granizado_sin_espacios", "un granizadodelulo"),
@@ -119,9 +148,21 @@ def evaluar(caso, db, proveedor, menu):
     originales = [{"producto": "granizado_lulo", "cantidad": 1}]
     if caso.clase == "mezcla":
         originales = [{"producto": caso.producto, "cantidad": caso.cantidad}]
-    if caso.clase != "pedido" and caso.clase not in {"desconocido", "ambiguo"}:
+    if caso.clase in {"opciones_copa", "opciones_copa_corruptas"}:
+        originales = [{"producto": caso.producto, "cantidad": caso.cantidad}]
+        if caso.clase == "opciones_copa_corruptas":
+            originales[0]["opciones"] = {
+                "sabor": ["vainilla", "frutos_rojos"],
+                "salsa": ["frutos_rojos"],
+                "topping": ["oreo"],
+            }
+    if caso.clase not in {"pedido", "desconocido", "ambiguo", "formulario"}:
         conv.contexto_json["carrito"] = originales
-        conv.estado = E.COMPLETANDO_OPCIONES if caso.clase == "mezcla" else E.RESUMEN
+        conv.estado = (
+            E.COMPLETANDO_OPCIONES
+            if caso.clase in {"mezcla", "opciones_copa", "opciones_copa_corruptas"}
+            else E.RESUMEN
+        )
     if caso.clase in {"cambio", "cambio_efectivo", "pago"}:
         enviar(boton="confirmar")
         enviar(boton="entrega:recoger")
@@ -153,6 +194,79 @@ def evaluar(caso, db, proveedor, menu):
             fallo = "Los sabores, salsa o topping no coinciden con lo solicitado"
         elif pedidos:
             fallo = "Registró un pedido sin confirmación"
+    elif caso.clase == "formulario":
+        llamadas = len(proveedor.salidas)
+        for codigo in ["yogurt_frutos_rojos", "vainilla", "frutos_rojos", "oreo"]:
+            actual = respuestas[-1]
+            boton = next(
+                (
+                    b
+                    for b in actual.botones
+                    if b.id.startswith("seleccion:") and b.id.endswith(":" + codigo)
+                ),
+                None,
+            )
+            if boton is None:
+                pagina = next((b for b in actual.botones if b.titulo == "Más opciones →"), None)
+                if pagina:
+                    respuestas += enviar(boton=pagina.id)
+                    boton = next(
+                        (
+                            b
+                            for b in respuestas[-1].botones
+                            if b.id.startswith("seleccion:") and b.id.endswith(":" + codigo)
+                        ),
+                        None,
+                    )
+            if boton is None:
+                fallo = "No ofreció una opción solicitada en las listas"
+                break
+            respuestas += enviar(boton=boton.id)
+        carrito = conv.contexto_json.get("carrito", [])
+        if fallo is None and (
+            conv.estado is not E.RESUMEN
+            or len(carrito) != 1
+            or carrito[0].get("opciones")
+            != {
+                "sabor": ["yogurt_frutos_rojos", "vainilla"],
+                "salsa": ["frutos_rojos"],
+                "topping": ["oreo"],
+            }
+            or len(proveedor.salidas) != llamadas
+            or db.scalars(select(Pedido)).all()
+        ):
+            fallo = "La selección no conservó las opciones o utilizó IA al pulsar las listas"
+    elif caso.clase in {"opciones_copa", "opciones_copa_corruptas"}:
+        esperadas = {"sabor": ["vainilla"], "salsa": ["frutos_rojos"], "topping": ["oreo"]}
+        if (
+            len(carrito) != 1
+            or carrito[0]["producto"] != caso.producto
+            or carrito[0]["cantidad"] != caso.cantidad
+            or carrito[0].get("opciones") != esperadas
+            or conv.estado is not E.COMPLETANDO_OPCIONES
+            or pedidos
+            or "falta 1 de 2" not in respuestas[0].texto
+            or "no es una opción" in respuestas[0].texto
+        ):
+            fallo = "Confundió salsa con sabor, inventó el segundo sabor o no aclaró lo que falta"
+        else:
+            respuestas += enviar("Los dos de vainilla")
+            carrito = conv.contexto_json.get("carrito", [])
+            esperadas["sabor"] = ["vainilla", "vainilla"]
+            if (
+                conv.estado is not E.RESUMEN
+                or len(carrito) != 1
+                or carrito[0].get("opciones") != esperadas
+                or db.scalars(select(Pedido)).all()
+            ):
+                fallo = "No entendió la repetición explícita o perdió salsa y topping"
+            else:
+                enviar(boton="confirmar")
+                enviar(boton="entrega:recoger")
+                respuestas += enviar(boton="pago:efectivo")
+                pedidos = db.scalars(select(Pedido)).all()
+                if len(pedidos) != 1 or pedidos[0].total != 12000:
+                    fallo = "No guardó un único pedido al precio oficial después de confirmar"
     elif caso.clase == "mezcla":
         if (
             conv.estado is not E.COMPLETANDO_OPCIONES

@@ -17,12 +17,14 @@ from app.pedidos.carrito import ItemValidado, ResultadoCarrito
 class Boton(BaseModel):
     id: str
     titulo: str
+    descripcion: str = ""
 
 
 class Respuesta(BaseModel):
     texto: str
     botones: list[Boton] = []
     documento: Literal["menu"] | None = None
+    lista: bool = False
 
 
 BOTONES_INICIO = [
@@ -126,7 +128,12 @@ def completar(resultado: ResultadoCarrito) -> Respuesta:
         for f in item.faltantes:
             etiqueta = adicionales.get(f.adicional, f.nombre) if f.adicional else f.nombre
             opciones = " / ".join(o.nombre.lower() for o in f.opciones)
-            lineas.append(f"• {etiqueta} (elige {f.cantidad}): {opciones}")
+            if f.cantidad < f.cantidad_total:
+                pendientes = f"falta {f.cantidad}" if f.cantidad == 1 else f"faltan {f.cantidad}"
+                indicacion = f"{pendientes} de {f.cantidad_total}; elige {f.cantidad} más"
+            else:
+                indicacion = f"elige {f.cantidad}"
+            lineas.append(f"• {etiqueta} ({indicacion}): {opciones}")
     lineas.append("\nRespóndeme todo en un solo mensaje 🙌")
     return Respuesta(texto="\n".join(lineas).strip(), botones=botones_mezcla(resultado))
 

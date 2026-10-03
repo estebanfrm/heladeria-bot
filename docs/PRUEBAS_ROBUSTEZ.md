@@ -5,16 +5,17 @@ IA local: Ollama, `gemma4-heladeria:12b`, basado en `gemma4:12b`, sin razonamien
 
 ## Resultado
 
-- **220 pruebas automáticas aprobadas**, sin casos omitidos. Ruff y formato correctos.
-- **28/28 escenarios de extremo a extremo aprobados con el modelo real**, incluyendo
-  los 27 anteriores y el caso de cinco micheladas con «Todas maracuya».
-  Los 28 escenarios tardaron 67,12 segundos en total; el más lento, 29,39 segundos.
+- **255 pruebas automáticas aprobadas**, sin casos omitidos. Ruff y formato correctos.
+- **34/34 escenarios de extremo a extremo aprobados con el modelo real**, incluyendo
+  los anteriores, las tres variantes de las capturas y la copa seleccionada por listas.
+  Duración total: 107,21 segundos; el escenario más lento, 30,65 segundos.
 - Datos y cuentas ficticios de `seeds/demo.json`; transacciones revertidas, sin envío
   de WhatsApp ni pedidos guardados en producción.
 - Evidencia detallada, con mensajes, respuestas y JSON del modelo:
-  `.local/robustez-micheladas.json` (archivo privado excluido de Git).
+  `.local/robustez-seleccion.json` (archivo privado excluido de Git).
 - Versión activada en el servidor de prueba del puerto 8001. El túnel responde;
   las solicitudes sin verificación siguen rechazándose y `/docs` sigue sin publicarse.
+  El envío real depende también de renovar el token temporal de Meta cuando vence.
 
 ## Escenarios y comportamiento comprobado
 
@@ -25,6 +26,10 @@ IA local: Ollama, `gemma4-heladeria:12b`, basado en `gemma4:12b`, sin razonamien
 | «copa keso con brauni y freza…», «copa de qeso…» | Conserva brownie, fresa, salsa frutos rojos y el topping solicitado. |
 | «malteda de 12 oz de vainilla» | Reconoce la malteada y pregunta salsa/topping; no inventa elecciones. |
 | Cinco micheladas, «Todas maracuya» | Explica que maracuyá pertenece a la mezcla frutos amarillos, solicita confirmación y conserva las cinco unidades. |
+| Copa queso, «Vainilla frutos rojos oreo triturado», con o sin saltos de línea | Conserva vainilla como único sabor, frutos rojos como salsa y oreo como topping; pide el segundo sabor. «Los dos de vainilla» completa sin duplicar el pedido. |
+| Corrección «Sabor Vainilla / Salsa frutos rojos / Toping oreo» con carrito anterior incorrecto | Corrige el carrito previo y elimina la salsa del grupo de sabores; no repite el error. |
+| Copa con yogur frutos rojos o maracuyá en sabor y salsa | Distingue los códigos del helado y de la salsa; conserva elecciones válidas en ambos grupos. |
+| Copa mediante listas, incluyendo un sabor en la segunda página | Avanza sabor 1 → sabor 2 → salsa → topping, conserva las elecciones y no utiliza IA para los toques. |
 | Hamburguesa, «eso mismo de la otra vez», «uno de» | No crea un pedido ni inventa una selección. |
 | Cambiar lulo por café o mora antes de pagar | Mantiene el pedido original hasta reconfirmar; después conserva el número y recalcula el precio. |
 | Quitar mora y mantener lulo | Quita exclusivamente el producto indicado. |
@@ -40,6 +45,13 @@ de pago, importe del domicilio, descarte de cambios, botones anteriores, confirm
 duplicada, comprobante durante edición, cambios de estado durante la edición y acceso
 a un ID de otro cliente. Los estados de pago verificado, enviado, entregado o cancelado
 bloquean cambios. Una transferencia en preparación tampoco es editable.
+
+La selección guiada prueba los once sabores, navegación sin cambiar el carrito,
+repetición solo cuando el menú la permite, salsa/topping y adicionales, varios productos,
+reinicio de selecciones y listas antiguas tras cierre/reapertura. Rechaza códigos
+manipulados, opciones de otro grupo y opciones agotadas después de mostrar la lista.
+No modifica pedidos registrados ni una edición si se verifica el pago entre pasos.
+Los mensajes de lista caben en las restricciones de filas, títulos y cuerpo de WhatsApp.
 
 Se verificó también el botón «Nuevo chat» mediante un webhook firmado: después del
 cierre envía el saludo, borra el borrador anterior y funciona si se vuelve a pulsar.
@@ -70,10 +82,15 @@ demasiado largos. Las decisiones financieras usan datos del menú y la BD.
    de maracuyá y lulo. Ahora se propone confirmar la mezcla con un botón o «sí» si
    hay una sola propuesta; no se crean sabores nuevos, no se elige automáticamente
    una mezcla y se conserva la cantidad. Las mezclas agotadas o ambiguas no se sugieren.
+6. La IA guardaba `frutos_rojos` como sabor y arrastraba ese dato al corregirlo, aunque
+   pertenece a salsa en la copa queso. Se reubican únicamente códigos exactos con un
+   grupo inequívoco dentro del producto; no cambia precios, disponibilidad ni adicionales.
+   La selección por listas evita esa clasificación de IA al tocar las opciones y muestra
+   el progreso sin llenar el mensaje con todos los sabores, salsas y toppings juntos.
 
 ## Alcance
 
-Los 28 resultados comprueban los mensajes concretos de la tabla; no garantizan que la
+Los 34 resultados comprueban los mensajes concretos de la tabla; no garantizan que la
 IA interprete cualquier forma de escribir. El resumen y la confirmación son obligatorios.
 Un comprobante recibido bloquea la edición automática y queda pendiente de revisión:
 la imagen no se considera prueba de pago verificado. El panel de verificación y las

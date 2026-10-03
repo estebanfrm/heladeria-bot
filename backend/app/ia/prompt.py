@@ -7,7 +7,7 @@ import json
 
 from app.enums import EstadoConversacion
 from app.menu.schema import Menu
-from app.pedidos.carrito import ItemSolicitado, validar_carrito
+from app.pedidos.carrito import ItemSolicitado, normalizar_opciones, validar_carrito
 
 REGLAS = """\
 Tu ÚNICA tarea es convertir el mensaje del cliente en JSON. No le respondes al cliente,
@@ -47,6 +47,13 @@ Reglas:
   el sistema se lo preguntará.
   Todos los valores son listas, incluso una sola elección: "salsa":["frutos_rojos"],
   "topping":["oreo"]. Nunca uses un texto suelto como valor de salsa o topping.
+- Distingue los grupos aunque el cliente no escriba etiquetas: en copa queso,
+  "vainilla frutos rojos oreo triturado" significa sabor:["vainilla"],
+  salsa:["frutos_rojos"], topping:["oreo"]. Frutos rojos es salsa; el helado de yogur
+  frutos rojos tiene otro código: "yogurt_frutos_rojos". Falta el segundo sabor:
+  NO repitas vainilla salvo que diga "los dos de vainilla" o "dos sabores de vainilla".
+- Una corrección explícita ("Sabor vainilla, salsa frutos rojos, toping oreo") reemplaza
+  los valores anteriores de esos grupos. No arrastres una salsa como sabor del carrito.
 - Si responde por partes ("copa: frutos rojos y maní. banana: ..."), asigna cada parte al
   producto que nombra. Usa FALTA ELEGIR para entender a qué responde.
 - "cantidad" es para unidades idénticas; si cambian las opciones, son ítems distintos.
@@ -93,6 +100,7 @@ def construir_prompt(
     estado: EstadoConversacion,
 ) -> tuple[str, str]:
     """(sistema, usuario) para el proveedor de IA."""
+    carrito = [normalizar_opciones(menu, i) for i in carrito]
     sistema = (
         f"Eres el intérprete de pedidos de {menu.negocio.nombre}, una heladería en "
         f"{menu.negocio.ciudad} que atiende por WhatsApp.\n{REGLAS}\nMENÚ\n{describir_menu(menu)}"
