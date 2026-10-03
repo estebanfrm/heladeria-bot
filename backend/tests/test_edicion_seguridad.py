@@ -47,7 +47,7 @@ def pedir(producto="granizado_lulo", cantidad=1, **campos):
 def registrar(db, bot, medio="nequi"):
     bot("un granizado de lulo", ia=pedir())
     bot(boton="confirmar")
-    bot(boton="entrega:recoger")
+    bot("recoger en el local")
     bot(boton="pago:" + medio)
     return db.scalars(select(Pedido)).one()
 
@@ -80,7 +80,7 @@ def test_salsa_clasificada_como_sabor_no_se_atasca_ni_inventa_segundo_sabor(
     r = bot("Los dos de vainilla", ia=pedir("copa_queso", opciones=completo))
     assert conv(db).estado is E.RESUMEN and "$12.000" in r[0].texto
     bot(boton="confirmar")
-    bot(boton="entrega:recoger")
+    bot("recoger en el local")
     bot(boton="pago:efectivo")
     pedido = db.scalars(select(Pedido)).one()
     assert pedido.total == 12000
@@ -286,7 +286,7 @@ def test_precios_estado_y_cuentas_inventados_en_json_no_se_usan(db, bot):
     )
     assert "$22.000" in r[0].texto
     bot(boton="confirmar")
-    bot(boton="entrega:recoger")
+    bot("recoger en el local")
     r = bot(boton="pago:nequi")
     pedido = db.scalars(select(Pedido)).one()
     assert pedido.total == 22000 and pedido.estado is EstadoPedido.PENDIENTE_PAGO
@@ -428,7 +428,7 @@ def test_micheladas_piden_confirmar_la_mezcla_y_conservan_cinco_unidades(
     assert "5× Michelada" in r[0].texto
     assert db.scalars(select(Pedido)).all() == []
     bot(boton="confirmar")
-    bot(boton="entrega:recoger")
+    bot("recoger en el local")
     bot(boton="pago:efectivo")
     pedido = db.scalar(select(Pedido))
     assert pedido.total == menu_demo.producto("michelada_soda").precio * 5

@@ -95,7 +95,7 @@ def test_conversacion_real_completa(db, chat):
     assert r[0].botones[3].titulo == "Elegir de nuevo"
 
     r = chat(boton="confirmar")
-    assert r[0].texto.startswith("¿A qué dirección lo enviamos y cómo pagas?")
+    assert r[0].texto == "¿Qué método de pago vas a usar?"
     assert "pago:nequi" in [b.id for b in r[0].botones]
 
     r = chat(CASO["entrega_y_pago"].mensaje, ia=CASO["entrega_y_pago"].ideal)
@@ -127,12 +127,62 @@ def test_conversacion_real_completa(db, chat):
 # --- Entrega y pago --------------------------------------------------------------------
 
 
+@pytest.mark.parametrize("medio", ["nequi", "daviplata", "efectivo", "datafono"])
+def test_confirmar_pregunta_solo_pago_y_despues_solo_direccion(db, chat, medio):
+    _hasta_resumen(chat)
+    r = chat(boton="confirmar")[0]
+    assert r.texto == "¿Qué método de pago vas a usar?"
+    assert all(b.id.startswith("pago:") for b in r.botones)
+    assert "dirección" not in r.texto and "local" not in r.texto
+    r = chat(boton="pago:" + medio)[0]
+    assert r.texto == "¿A qué dirección lo enviamos?" and r.botones == []
+    assert not db.scalars(select(Pedido)).all()
+    chat("Cra 8 #80-70")
+    pedido = db.scalars(select(Pedido)).one()
+    assert pedido.direccion == "Cra 8 #80-70" and pedido.medio_pago.codigo == medio
+
+
+def test_boton_antiguo_de_recogida_no_cambia_la_entrega(db, chat):
+    _hasta_resumen(chat)
+    chat(boton="confirmar")
+    r = chat(boton="entrega:recoger")[0]
+    assert r.texto == "¿Qué método de pago vas a usar?"
+    assert _conv(db).contexto_json.get("entrega", {}).get("tipo") is None
+    chat(boton="pago:efectivo")
+    chat("CRA 40 96a02")
+    r = chat(boton="entrega:recoger")[0]
+    assert "¿La confirmas para el domicilio?" in r.texto
+    assert _conv(db).contexto_json["direccion_por_confirmar"] == "CRA 40 96a02"
+    assert not db.scalars(select(Pedido)).all()
+
+
+def test_direccion_compacta_anticipada_se_confirma_despues_del_pago(db, chat):
+    _hasta_resumen(chat)
+    chat(boton="confirmar")
+    r = chat("CRA 40 96a02")[0]
+    assert r.texto == "¿Qué método de pago vas a usar?"
+    r = chat(boton="pago:efectivo")[0]
+    assert "¿La confirmas para el domicilio?" in r.texto
+    chat(boton="direccion:confirmar")
+    assert db.scalars(select(Pedido)).one().direccion == "CRA 40 96a02"
+
+
+def test_error_ia_antes_de_elegir_pago_no_pregunta_direccion(db, chat):
+    _hasta_resumen(chat)
+    chat(boton="confirmar")
+    r = chat("no se", ia="json incorrecto")[0]
+    assert r.texto == "¿Qué método de pago vas a usar?"
+    assert all(b.id.startswith("pago:") for b in r.botones)
+    assert _conv(db).modo is ModoConversacion.BOT
+    assert not db.scalars(select(Pedido)).all()
+
+
 def test_recoger_y_efectivo_pasa_directo_a_preparacion(db, chat):
     _hasta_resumen(chat)
     chat(boton="confirmar")
 
-    r = chat(boton="entrega:recoger")
-    assert r[0].texto == "¿Cómo vas a pagar?"
+    r = chat("recoger en el local")
+    assert r[0].texto == "¿Qué método de pago vas a usar?"
     assert "entrega:recoger" not in [b.id for b in r[0].botones]
 
     r = chat(boton="pago:efectivo")
@@ -152,6 +202,8 @@ def test_domicilio_se_avisa_y_se_cobra(db, chat):
     _hasta_resumen(chat)
 
     r = chat(boton="confirmar")
+    assert r[0].texto == "¿Qué método de pago vas a usar?"
+    r = chat(boton="pago:nequi")
     assert "El domicilio cuesta $3.000." in r[0].texto
 
     r = chat(CASO["entrega_y_pago"].mensaje, ia=CASO["entrega_y_pago"].ideal)
@@ -160,7 +212,8 @@ def test_domicilio_se_avisa_y_se_cobra(db, chat):
     assert (pedido.subtotal, pedido.domicilio, pedido.total) == (24000, 3000, 27000)
 
 
-def test_entrega_por_partes_y_medio_de_pago_invalido(db, chat):
+@pytest.mark.parametrize("medio_invalido", ["bitcoin", ""])
+def test_entrega_por_partes_y_medio_de_pago_invalido(db, chat, medio_invalido):
     _hasta_resumen(chat)
     chat(boton="confirmar")
 
@@ -168,12 +221,14 @@ def test_entrega_por_partes_y_medio_de_pago_invalido(db, chat):
         "Calle Falsa 123",
         ia=_pedir(Intencion.ENTREGA, entrega=DatosEntrega(direccion="Calle Falsa 123")),
     )
-    assert r[0].texto == "¿Cómo vas a pagar?"
+    assert r[0].texto == "¿Qué método de pago vas a usar?"
 
     r = chat(
-        "con bitcoin", ia=_pedir(Intencion.ENTREGA, entrega=DatosEntrega(medio_pago="bitcoin"))
+        "otro medio", ia=_pedir(Intencion.ENTREGA, entrega=DatosEntrega(medio_pago=medio_invalido))
     )
-    assert r[0].texto.startswith("⚠️ No recibimos «bitcoin». Puedes pagar con: Nequi, Daviplata")
+    assert r[0].texto.startswith(
+        f"⚠️ No recibimos «{medio_invalido}». Puedes pagar con: Nequi, Daviplata"
+    )
 
     r = chat(boton="pago:daviplata")
     assert "al *Daviplata 300 000 0000*" in r[0].texto
@@ -441,7 +496,7 @@ def test_recoger_descarta_direccion_sin_confirmar(db, chat):
     chat(boton="confirmar")
     chat(boton="pago:efectivo")
     chat("CRA 40 96a02")
-    chat(boton="entrega:recoger")
+    chat("recoger en el local")
     pedido = db.scalars(select(Pedido)).one()
     assert pedido.tipo_entrega is TipoEntrega.RECOGER
     assert pedido.direccion is None

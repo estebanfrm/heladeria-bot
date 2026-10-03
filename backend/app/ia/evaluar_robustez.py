@@ -37,6 +37,7 @@ class Caso:
 
 
 CASOS = [
+    Caso("pago_antes_direccion", "un granizado de lulo", "pago_direccion"),
     Caso("copa_por_listas", "una copa queso", "formulario", "copa_queso"),
     Caso("michelada_maracuya", "Todas maracuya", "mezcla", "michelada_soda", 5),
     Caso(
@@ -156,7 +157,7 @@ def evaluar(caso, db, proveedor, menu):
                 "salsa": ["frutos_rojos"],
                 "topping": ["oreo"],
             }
-    if caso.clase not in {"pedido", "desconocido", "ambiguo", "formulario"}:
+    if caso.clase not in {"pedido", "desconocido", "ambiguo", "formulario", "pago_direccion"}:
         conv.contexto_json["carrito"] = originales
         conv.estado = (
             E.COMPLETANDO_OPCIONES
@@ -165,7 +166,7 @@ def evaluar(caso, db, proveedor, menu):
         )
     if caso.clase in {"cambio", "cambio_efectivo", "pago"}:
         enviar(boton="confirmar")
-        enviar(boton="entrega:recoger")
+        enviar(texto="recoger en el local")
         enviar(boton="pago:efectivo" if caso.clase == "cambio_efectivo" else "pago:nequi")
     if caso.clase == "quitar":
         conv.contexto_json["carrito"] = originales + [{"producto": "granizado_mora", "cantidad": 1}]
@@ -194,6 +195,26 @@ def evaluar(caso, db, proveedor, menu):
             fallo = "Los sabores, salsa o topping no coinciden con lo solicitado"
         elif pedidos:
             fallo = "Registró un pedido sin confirmación"
+    elif caso.clase == "pago_direccion":
+        if conv.estado is not E.RESUMEN:
+            fallo = "No llegó al resumen antes del pago"
+        else:
+            respuestas += enviar(boton="confirmar")
+            pago = respuestas[-1]
+            if pago.texto != "¿Qué método de pago vas a usar?" or any(
+                not b.id.startswith("pago:") for b in pago.botones
+            ):
+                fallo = "Mezcló pago con dirección o mostró recogida"
+            respuestas += enviar(boton="pago:efectivo")
+            direccion = respuestas[-1]
+            if direccion.texto != "¿A qué dirección lo enviamos?" or direccion.botones:
+                fallo = "No preguntó solo dirección después del pago"
+            if db.scalars(select(Pedido)).all():
+                fallo = "Registró el pedido sin dirección"
+            respuestas += enviar("Calle 99 #10-20")
+            pedidos = db.scalars(select(Pedido)).all()
+            if len(pedidos) != 1 or pedidos[0].total != 8000 or pedidos[0].domicilio != 0:
+                fallo = "No registró correctamente el pedido después de la dirección"
     elif caso.clase == "formulario":
         llamadas = len(proveedor.salidas)
         for codigo in ["yogurt_frutos_rojos", "vainilla", "frutos_rojos", "oreo"]:
@@ -262,7 +283,7 @@ def evaluar(caso, db, proveedor, menu):
                 fallo = "No entendió la repetición explícita o perdió salsa y topping"
             else:
                 enviar(boton="confirmar")
-                enviar(boton="entrega:recoger")
+                enviar(texto="recoger en el local")
                 respuestas += enviar(boton="pago:efectivo")
                 pedidos = db.scalars(select(Pedido)).all()
                 if len(pedidos) != 1 or pedidos[0].total != 12000:

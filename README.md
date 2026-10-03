@@ -1,7 +1,7 @@
 # 🍦 Heladería Bot
 
 Chatbot de pedidos por WhatsApp para una heladería: toma el pedido completo
-(menú → productos → opciones → total → dirección → pago), lo envía al personal
+(menú → productos → opciones → total → método de pago → dirección), lo envía al personal
 con botones de estado y lo registra en un panel.
 
 > Proyecto en desarrollo. Ver la planeación completa en [`PLANEACION.md`](PLANEACION.md).
@@ -188,6 +188,12 @@ La selección muestra lo ya elegido, valida disponibilidad y repeticiones en cad
 y permite «Elegir de nuevo» antes de confirmar. Las listas anteriores no cambian un
 carrito nuevo ni un pedido ya registrado. El chat web conserva las preguntas por texto.
 
+Después de confirmar el resumen, se pregunta únicamente el método de pago. Al elegirlo,
+se pide la dirección y, si aplica, se informa el costo del domicilio. Los datos ya dados
+se conservan y no se vuelven a pedir. No se ofrece el botón ni la sugerencia de recoger
+en el local; sus botones antiguos se ignoran. La recogida sigue disponible si el cliente
+la pide expresamente por texto, por ejemplo «recoger en el local».
+
 Si la IA clasifica un código exacto en el grupo equivocado, se reubica solo cuando
 pertenece inequívocamente a otro grupo del mismo producto. Una salsa duplicada como
 sabor no se conserva en ambos grupos; no se inventa un segundo sabor ni se aceptan
@@ -201,7 +207,7 @@ deduce una mezcla cuando varias comparten el mismo ingrediente.
 
 ### Evaluar mensajes con la IA real
 
-Desde `backend/`, `uv run python -m app.ia.evaluar_robustez` ejecuta 34 escenarios
+Desde `backend/`, `uv run python -m app.ia.evaluar_robustez` ejecuta 35 escenarios
 con el proveedor configurado. Usa siempre `seeds/demo.json`, clientes ficticios y
 transacciones revertidas en `heladeria_test`; no envía WhatsApp ni registra pedidos
 reales. Guarda mensajes, respuestas, JSON del modelo y resultados en
