@@ -62,6 +62,7 @@ class Faltante(BaseModel):
     grupo: str
     nombre: str  # ej. "Salsa"
     cantidad: int  # cuántas faltan
+    cantidad_total: int = 1  # cuántas lleva el producto en ese grupo
     opciones: list[Opcion]  # disponibles para elegir
     adicional: str | None = None  # si lo exige un adicional (ej. cuál topping extra)
 
@@ -114,6 +115,35 @@ class ResultadoCarrito(BaseModel):
 
 
 # --- Reglas ------------------------------------------------------------------------
+
+
+def normalizar_opciones(menu: Menu, item: ItemSolicitado) -> ItemSolicitado:
+    """Reubica códigos exactos en un único grupo del producto, sin inventar elecciones.
+
+    Si la IA duplicó una salsa también como sabor, conserva la salsa ya elegida.
+    Los códigos desconocidos o ambiguos siguen sujetos a la validación estricta.
+    No toca adicionales ni interpreta ingredientes de mezclas.
+    """
+    producto = next((p for p in menu.productos if p.id == item.producto and p.activo), None)
+    if producto is None:
+        return item.model_copy(deep=True)
+    grupos = {g.id: g for g in menu.grupos_opciones}
+    permitidas = {
+        grupos[s.grupo].tipo: {o.id for o in grupos[s.grupo].opciones} for s in producto.selecciones
+    }
+    opciones: dict[TipoGrupo, list[str]] = {}
+    for tipo, codigos in item.opciones.items():
+        for codigo in codigos:
+            destinos = [t for t, validas in permitidas.items() if codigo in validas]
+            if codigo in permitidas.get(tipo, set()) or len(destinos) != 1:
+                opciones.setdefault(tipo, []).append(codigo)
+                continue
+            destino = destinos[0]
+            if codigo not in item.opciones.get(destino, []):
+                opciones.setdefault(destino, []).append(codigo)
+    resultado = item.model_copy(deep=True)
+    resultado.opciones = {tipo: codigos for tipo, codigos in opciones.items() if codigos}
+    return resultado
 
 
 def validar_carrito(
@@ -224,7 +254,9 @@ def _validar_selecciones(
             OpcionElegida(grupo=grupo.id, codigo=o.id, nombre=o.nombre) for o in elegidas
         ]
         if len(elegidas) < seleccion.cantidad:
-            resultado.faltantes.append(_faltante(grupo, seleccion.cantidad - len(elegidas)))
+            resultado.faltantes.append(
+                _faltante(grupo, seleccion.cantidad - len(elegidas), total=seleccion.cantidad)
+            )
 
 
 def _validar_adicionales(
@@ -333,11 +365,14 @@ def _mezcla_por_ingrediente(grupo: GrupoOpciones, codigo: str) -> Opcion | None:
     return coincidencias[0] if len(coincidencias) == 1 else None
 
 
-def _faltante(grupo: GrupoOpciones, cantidad: int, adicional: str | None = None) -> Faltante:
+def _faltante(
+    grupo: GrupoOpciones, cantidad: int, adicional: str | None = None, *, total: int = 1
+) -> Faltante:
     return Faltante(
         grupo=grupo.id,
         nombre=grupo.nombre,
         cantidad=cantidad,
+        cantidad_total=total,
         opciones=[o for o in grupo.opciones if o.disponible],
         adicional=adicional,
     )

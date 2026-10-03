@@ -8,6 +8,7 @@ from app.menu.schema import Opcion
 from app.pedidos.carrito import (
     AdicionalSolicitado,
     ItemSolicitado,
+    normalizar_opciones,
     validar_carrito,
     validar_item,
 )
@@ -25,6 +26,75 @@ BANANA_SPLIT = ItemSolicitado(
         "topping": ["oreo"],
     },
 )
+
+
+@pytest.mark.parametrize(
+    ("opciones", "esperadas"),
+    [
+        (
+            {"sabor": ["vainilla", "frutos_rojos"], "topping": ["oreo"]},
+            {"sabor": ["vainilla"], "salsa": ["frutos_rojos"], "topping": ["oreo"]},
+        ),
+        (
+            {"sabor": ["vainilla", "frutos_rojos"], "salsa": ["frutos_rojos"]},
+            {"sabor": ["vainilla"], "salsa": ["frutos_rojos"]},
+        ),
+        (
+            {"sabor": ["oreo"], "topping": ["vainilla", "vainilla"]},
+            {"sabor": ["vainilla", "vainilla"], "topping": ["oreo"]},
+        ),
+    ],
+)
+def test_reubica_solo_codigos_exactos_sin_duplicarlos_ni_mutar_el_original(
+    menu_demo, opciones, esperadas
+):
+    original = ItemSolicitado(producto="copa_queso", cantidad=3, opciones=opciones)
+    corregido = normalizar_opciones(menu_demo, original)
+    assert corregido.opciones == esperadas
+    assert corregido.cantidad == 3 and original.opciones == opciones
+    assert normalizar_opciones(menu_demo, corregido) == corregido
+
+
+@pytest.mark.parametrize(
+    ("producto", "opciones"),
+    [
+        ("copa_queso", {"variante": ["maracuya"]}),  # válido en dos grupos: ambiguo
+        ("copa_queso", {"sabor": ["sabor_inventado"]}),
+        ("copa_queso", {"salsa": ["mora"]}),  # existe en otro producto, no en la copa
+        ("granizado_lulo", {"topping": ["oreo"]}),
+        ("pizza", {"sabor": ["frutos_rojos"]}),
+    ],
+)
+def test_no_reubica_opciones_ambiguas_desconocidas_o_de_otros_productos(
+    menu_demo, producto, opciones
+):
+    original = ItemSolicitado(producto=producto, opciones=opciones)
+    assert normalizar_opciones(menu_demo, original) == original
+    assert validar_item(menu_demo, original).problemas
+
+
+def test_reubicar_no_oculta_agotados_excesos_ni_adicionales_invalidos(menu_demo):
+    next(
+        o for o in menu_demo.grupo("salsas_base").opciones if o.id == "frutos_rojos"
+    ).disponible = False
+    original = ItemSolicitado(
+        producto="copa_queso",
+        opciones={"sabor": ["vainilla", "frutos_rojos"]},
+        adicionales=[AdicionalSolicitado(adicional="topping_extra", opcion="frutos_rojos")],
+    )
+    corregido = normalizar_opciones(menu_demo, original)
+    validado = validar_item(menu_demo, corregido)
+    assert _codigos(validado.problemas) == ["opcion_agotada", "opcion_no_existe"]
+    assert corregido.adicionales == original.adicionales
+    exceso = normalizar_opciones(
+        menu_demo,
+        ItemSolicitado(producto="copa_queso", opciones={"sabor": ["frutos_rojos", "frutos_rojos"]}),
+    )
+    assert exceso.opciones["salsa"] == ["frutos_rojos", "frutos_rojos"]
+    next(
+        o for o in menu_demo.grupo("salsas_base").opciones if o.id == "frutos_rojos"
+    ).disponible = True
+    assert "sobran_opciones" in _codigos(validar_item(menu_demo, exceso).problemas)
 
 
 @pytest.mark.parametrize("modificacion", ["ambigua", "agotada"])

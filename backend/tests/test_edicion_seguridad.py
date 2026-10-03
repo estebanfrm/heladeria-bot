@@ -56,6 +56,36 @@ def conv(db):
     return db.scalars(select(Conversacion).where(Conversacion.id_externo == "573000000000")).one()
 
 
+@pytest.mark.parametrize("salsa_duplicada", [False, True])
+def test_salsa_clasificada_como_sabor_no_se_atasca_ni_inventa_segundo_sabor(
+    db, bot, salsa_duplicada
+):
+    bot("Una copa queso", ia=pedir("copa_queso"))
+    opciones = {"sabor": ["vainilla", "frutos_rojos"], "topping": ["oreo"]}
+    if salsa_duplicada:
+        opciones["salsa"] = ["frutos_rojos"]
+    r = bot("Vainilla frutos rojos oreo triturado", ia=pedir("copa_queso", opciones=opciones))
+    esperado = {"sabor": ["vainilla"], "salsa": ["frutos_rojos"], "topping": ["oreo"]}
+    assert conv(db).contexto_json["carrito"][0]["opciones"] == esperado
+    assert conv(db).estado is E.COMPLETANDO_OPCIONES
+    assert "no es una opción" not in r[0].texto
+    assert "falta 1 de 2" in r[0].texto
+    bot(
+        "Sabor Vainilla\nSalsa frutos rojos\nToping oreo triturado",
+        ia=pedir("copa_queso", opciones=opciones),
+    )
+    assert conv(db).contexto_json["carrito"][0]["opciones"] == esperado
+    assert not db.scalars(select(Pedido)).all()
+    completo = {**esperado, "sabor": ["vainilla", "vainilla"]}
+    r = bot("Los dos de vainilla", ia=pedir("copa_queso", opciones=completo))
+    assert conv(db).estado is E.RESUMEN and "$12.000" in r[0].texto
+    bot(boton="confirmar")
+    bot(boton="entrega:recoger")
+    bot(boton="pago:efectivo")
+    pedido = db.scalars(select(Pedido)).one()
+    assert pedido.total == 12000
+
+
 @pytest.mark.parametrize("medio", ["nequi", "efectivo", "datafono"])
 def test_editar_conserva_numero_y_no_cambia_el_pedido_hasta_confirmar(db, bot, medio):
     pedido = registrar(db, bot, medio)

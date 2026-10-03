@@ -61,7 +61,7 @@ def construir_mensajes(
         mensajes.append(base | {"type": "text", "text": {"body": texto, "preview_url": False}})
         texto = "Elige una opción:"
 
-    if len(botones) <= MAX_BOTONES:
+    if len(botones) <= MAX_BOTONES and not respuesta.lista:
         interactivo = {
             "type": "button",
             "body": {"text": texto},
@@ -82,7 +82,9 @@ def construir_mensajes(
                     {
                         "title": "Opciones",
                         "rows": [
-                            {"id": b.id, "title": b.titulo[:MAX_TITULO_FILA]} for b in botones
+                            {"id": b.id, "title": b.titulo[:MAX_TITULO_FILA]}
+                            | ({"description": b.descripcion[:72]} if b.descripcion else {})
+                            for b in botones
                         ],
                     }
                 ],

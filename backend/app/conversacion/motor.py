@@ -8,12 +8,13 @@ La IA solo interpreta: precios, validaciones, estados y pedidos los decide este 
 import logging
 import re
 from dataclasses import dataclass
+from uuid import uuid4
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.conversacion import mensajes
+from app.conversacion import mensajes, seleccion
 from app.conversacion.inactividad import ahora_utc, cerrar_si_inactiva
 from app.conversacion.mensajes import Respuesta
 from app.conversacion.protecciones import (
@@ -36,7 +37,12 @@ from app.ia.servicio import interpretar
 from app.menu.carga import leer_menu
 from app.menu.schema import Menu
 from app.models import Cliente, Conversacion, Mensaje, Pedido
-from app.pedidos.carrito import ItemSolicitado, validar_carrito
+from app.pedidos.carrito import (
+    ItemSolicitado,
+    ResultadoCarrito,
+    normalizar_opciones,
+    validar_carrito,
+)
 from app.pedidos.servicio import crear_pedido, editable, recuperar_carrito
 
 logger = logging.getLogger(__name__)
@@ -162,6 +168,12 @@ class Motor:
             ]
 
         texto = normalizar(e.texto)
+        if conv.estado is E.COMPLETANDO_OPCIONES and texto in {
+            "ver opciones",
+            "elegir sabores",
+            "formulario",
+        }:
+            return self._paso_actual(conv, menu)
         if conv.estado is E.COMPLETANDO_OPCIONES and texto in {"si", "si esa mezcla"}:
             botones = mensajes.botones_mezcla(validar_carrito(menu, self._carrito(conv)))
             if len(botones) == 1:
@@ -271,6 +283,8 @@ class Motor:
         return self._paso_actual(conv, menu)
 
     def _boton(self, conv: Conversacion, menu: Menu, boton: str) -> list[Respuesta]:
+        if boton.startswith(("seleccion:", "seleccion-pagina:", "seleccion-reiniciar:")):
+            return self._seleccionar(conv, menu, boton)
         if boton == "chat:nuevo":
             return self._paso_actual(
                 conv, menu
@@ -340,7 +354,71 @@ class Motor:
                         for v in valores
                     ]
                     return self._actualizar_carrito(conv, menu, items)
-        return [mensajes.completar(resultado)]
+        return [self._completar(conv, menu, resultado)]
+
+    def _completar(
+        self, conv: Conversacion, menu: Menu, resultado: ResultadoCarrito, pagina: int = 0
+    ) -> Respuesta:
+        if conv.canal is Canal.WHATSAPP and not mensajes.botones_mezcla(resultado):
+            token = conv.contexto_json.setdefault("opciones_token", uuid4().hex[:12])
+            respuesta = seleccion.presentar(menu, resultado, token, pagina)
+            if respuesta is not None:
+                return respuesta
+            respuesta = mensajes.completar(resultado)
+            if resultado.items:
+                respuesta.botones.append(seleccion.reiniciar(token))
+            return respuesta
+        return mensajes.completar(resultado)
+
+    def _seleccionar(self, conv: Conversacion, menu: Menu, boton: str) -> list[Respuesta]:
+        partes = boton.split(":")
+        token = conv.contexto_json.get("opciones_token")
+        if (
+            conv.canal is not Canal.WHATSAPP
+            or conv.estado not in {E.COMPLETANDO_OPCIONES, E.RESUMEN}
+            or not token
+            or len(partes) < 2
+            or partes[1] != token
+        ):
+            return self._paso_actual(conv, menu)
+        if conv.contexto_json.get("edicion_pedido_id"):
+            pedido = self._pedido_vigente(conv)
+            if pedido is None or not editable(pedido):
+                return [mensajes.edicion_bloqueada()]
+        items = [normalizar_opciones(menu, i) for i in self._carrito(conv)]
+        if partes[0] == "seleccion-reiniciar" and len(partes) == 2:
+            for item in items:
+                item.opciones = {}
+                for adicional in item.adicionales:
+                    adicional.opcion = None
+            conv.contexto_json.pop("opciones_token", None)
+            return self._actualizar_carrito(conv, menu, items)
+        resultado = validar_carrito(menu, items)
+        paso = seleccion.siguiente(menu, resultado)
+        if conv.estado is not E.COMPLETANDO_OPCIONES or paso is None or len(partes) != 3:
+            return self._paso_actual(conv, menu)
+        if partes[0] == "seleccion-pagina":
+            if partes[2].isdecimal() and len(partes[2]) <= 3:
+                return [self._completar(conv, menu, resultado, int(partes[2]))]
+        elif partes[0] == "seleccion" and partes[2] in {o.id for o in paso.opciones}:
+            item = items[paso.indice]
+            if paso.faltante.adicional:
+                adicional = next(
+                    a
+                    for a in item.adicionales
+                    if a.adicional == paso.faltante.adicional and a.opcion is None
+                )
+                adicional.opcion = partes[2]
+            else:
+                # Retira valores inválidos de este grupo antes de incorporar la elección.
+                validas = [
+                    o.codigo
+                    for o in resultado.items[paso.indice].opciones
+                    if o.grupo == paso.faltante.grupo
+                ]
+                item.opciones[paso.tipo] = validas + [partes[2]]
+            return self._actualizar_carrito(conv, menu, items)
+        return [self._completar(conv, menu, resultado)]
 
     def _pedido_vigente(self, conv: Conversacion) -> Pedido | None:
         id_pedido = conv.contexto_json.get("edicion_pedido_id") or conv.contexto_json.get(
@@ -410,8 +488,12 @@ class Motor:
     def _actualizar_carrito(
         self, conv: Conversacion, menu: Menu, items: list[ItemSolicitado]
     ) -> list[Respuesta]:
+        items = [normalizar_opciones(menu, i) for i in items]
+        carrito_json = [i.model_dump(mode="json") for i in items]
+        if carrito_json != conv.contexto_json.get("carrito"):
+            conv.contexto_json["opciones_token"] = uuid4().hex[:12]
         conv.contexto_json.pop("direccion_por_confirmar", None)
-        conv.contexto_json["carrito"] = [i.model_dump(mode="json") for i in items]
+        conv.contexto_json["carrito"] = carrito_json
         if not items:
             conv.estado = E.TOMANDO_PEDIDO
             return [mensajes.pedir_texto()]
@@ -419,12 +501,15 @@ class Motor:
         if resultado.completo:
             conv.estado = E.RESUMEN
             r = mensajes.resumen(resultado)
+            if conv.canal is Canal.WHATSAPP and any(i.opciones for i in resultado.items):
+                token = conv.contexto_json.setdefault("opciones_token", uuid4().hex[:12])
+                r.botones.append(seleccion.reiniciar(token))
             if conv.contexto_json.get("edicion_pedido_id"):
                 r.texto = "Revisa los cambios antes de guardarlos.\n" + r.texto
                 r.botones.append(mensajes.Boton(id="edicion:descartar", titulo="Mantener pedido"))
             return [r]
         conv.estado = E.COMPLETANDO_OPCIONES
-        return [mensajes.completar(resultado)]
+        return [self._completar(conv, menu, resultado)]
 
     def _confirmar(self, conv: Conversacion, menu: Menu) -> list[Respuesta]:
         if conv.contexto_json.get("edicion_pedido_id"):
@@ -456,7 +541,7 @@ class Motor:
         resultado = validar_carrito(menu, self._carrito(conv), tipo)
         if not resultado.completo:  # ej. algo se agotó mientras tanto
             conv.estado = E.COMPLETANDO_OPCIONES
-            return [mensajes.completar(resultado)]
+            return [self._completar(conv, menu, resultado)]
 
         medio = medios[entrega.medio_pago]
         estado = (

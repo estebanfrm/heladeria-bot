@@ -181,6 +181,18 @@ Las elecciones incompletas se preguntan y los productos inexistentes no se susti
 por otro. Una opción única que la IA entregue como texto se normaliza a una lista
 de un elemento y conserva la validación contra el menú.
 
+En WhatsApp las opciones se eligen con listas, una por paso: primer sabor, segundo
+sabor si corresponde, salsa y topping. Los once sabores se muestran en páginas con
+«Más opciones» y «Anteriores»; no hay que escribirlos ni ver todos los grupos juntos.
+La selección muestra lo ya elegido, valida disponibilidad y repeticiones en cada toque,
+y permite «Elegir de nuevo» antes de confirmar. Las listas anteriores no cambian un
+carrito nuevo ni un pedido ya registrado. El chat web conserva las preguntas por texto.
+
+Si la IA clasifica un código exacto en el grupo equivocado, se reubica solo cuando
+pertenece inequívocamente a otro grupo del mismo producto. Una salsa duplicada como
+sabor no se conserva en ambos grupos; no se inventa un segundo sabor ni se aceptan
+opciones desconocidas, ambiguas o de otro producto.
+
 Para mezclas del menú, mencionar un ingrediente no selecciona automáticamente toda
 la mezcla. «Todas maracuya» en cinco micheladas ofrece confirmar «Frutos amarillos
 (maracuyá y lulo)» con un botón. «Sí» confirma esa propuesta si es única; luego se
@@ -189,7 +201,7 @@ deduce una mezcla cuando varias comparten el mismo ingrediente.
 
 ### Evaluar mensajes con la IA real
 
-Desde `backend/`, `uv run python -m app.ia.evaluar_robustez` ejecuta 28 escenarios
+Desde `backend/`, `uv run python -m app.ia.evaluar_robustez` ejecuta 34 escenarios
 con el proveedor configurado. Usa siempre `seeds/demo.json`, clientes ficticios y
 transacciones revertidas en `heladeria_test`; no envía WhatsApp ni registra pedidos
 reales. Guarda mensajes, respuestas, JSON del modelo y resultados en

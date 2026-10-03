@@ -78,8 +78,9 @@ def test_conversacion_real_completa(db, chat):
 
     r = chat(CASO["pedido_inicial"].mensaje, ia=CASO["pedido_inicial"].ideal)
     assert "*Copa queso* (brownie, fresa)" in r[0].texto
-    assert "• Salsa (elige 1): frutos rojos / maracuyá / lecherita" in r[0].texto
-    assert "*Banana split*\n• Sabor de helado (elige 3): vainilla chips / vainilla" in r[0].texto
+    assert "Elige salsa: 1 de 1" in r[0].texto and r[0].lista
+    assert {b.titulo for b in r[0].botones} >= {"Frutos rojos", "Maracuyá", "Lecherita"}
+    assert "Banana split" not in r[0].texto  # una elección por paso
     assert _conv(db).estado is E.COMPLETANDO_OPCIONES
 
     r = chat(CASO["completar_opciones"].mensaje, ia=CASO["completar_opciones"].ideal)
@@ -90,7 +91,8 @@ def test_conversacion_real_completa(db, chat):
         " — $12.000\n"
         "*Total: $24.000*"
     )
-    assert [b.id for b in r[0].botones] == ["confirmar", "agregar", "cambiar"]
+    assert [b.id for b in r[0].botones[:3]] == ["confirmar", "agregar", "cambiar"]
+    assert r[0].botones[3].titulo == "Elegir de nuevo"
 
     r = chat(boton="confirmar")
     assert r[0].texto.startswith("¿A qué dirección lo enviamos y cómo pagas?")
@@ -204,7 +206,8 @@ def test_problemas_del_carrito_se_explican(db, chat):
     r = chat("copa queso con salsa de mora", ia=_pedir(items=[copa]))
 
     assert r[0].texto.startswith("⚠️ 'mora' no es una opción de salsa para Copa queso.")
-    assert "• Salsa (elige 1): frutos rojos / maracuyá / lecherita" in r[0].texto
+    assert "Elige salsa: 1 de 1" in r[0].texto and r[0].lista
+    assert {b.titulo for b in r[0].botones} >= {"Frutos rojos", "Maracuyá", "Lecherita"}
     assert _conv(db).estado is E.COMPLETANDO_OPCIONES
 
 
@@ -282,7 +285,7 @@ def test_esperando_pago_no_se_cambia_el_pedido_sin_confirmar(db, chat):
 
     r = chat("agrégale un cono", ia=_pedir(items=[ItemSolicitado(producto="cono_1")]))
 
-    assert "Revisa los cambios antes de guardarlos" in r[0].texto or "Para completar" in r[0].texto
+    assert r[0].lista and "Elige sabor de helado: 1 de 1" in r[0].texto
     assert db.scalars(select(Pedido)).one().total == 24000
 
 
