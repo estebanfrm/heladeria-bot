@@ -591,6 +591,7 @@ WEB_CHAT_MAX_MSGS_PER_SESSION=20
 - [x] Endpoint de prueba `/chat` + pruebas con pytest usando los mensajes del chat real (`app/canales/web.py`: límite de mensajes por sesión, 500 caracteres, sin IA configurada siguen los botones)
 
 ### Fase 2 — Canales
+- [x] Preguntas de selección simplificadas: sabores sin texto de faltantes ni número de página; salsa y topping solo pregunta en negrilla. Navegación «Más opciones»/«Anteriores» conserva el carrito y permite acceder a todos los sabores.
 - [x] Después del resumen: preguntar solo método de pago y luego dirección, conservando datos anticipados y el costo de domicilio. Eliminados el botón/sugerencias de recogida y su efecto al pulsar botones antiguos; recogida solo por solicitud escrita. Suite: 263 pruebas aprobadas.
 - [x] Selección guiada en WhatsApp: un sabor por paso, luego salsa/topping y opciones de adicionales. Páginas para los once sabores, elecciones conservadas, reinicio antes de confirmar, validación de disponibilidad/repeticiones y listas anteriores sin efecto. Corrección del caso «Vainilla frutos rojos oreo» sin inventar un segundo sabor ni arrastrar grupos incorrectos. Suite: 255 pruebas y 34/34 escenarios con IA real.
 - [x] Ingredientes de mezclas en micheladas: «maracuya» ofrece confirmar «frutos amarillos (maracuyá y lulo)» sin seleccionar la mezcla automáticamente. Botón o «sí» con propuesta única; cantidades conservadas, mezcla agotada/ambigua rechazada y botones antiguos sin efecto. Suite: 220 pruebas aprobadas.

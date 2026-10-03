@@ -132,6 +132,8 @@ npx vitest run && npm run type-check && npx eslint . && npx prettier --check src
      WhatsApp permite elegir un sabor por paso, después salsa/topping, con páginas para
      los once sabores y «Elegir de nuevo». Cada toque valida el menú sin IA; un token
      del carrito invalida listas anteriores, reinicios y botones de otros chats.
+     Sabores sin contador de faltantes ni número de página; salsa y topping solo
+     pregunta en negrilla. «Más opciones» conserva el carrito al mostrar otros sabores.
      Después de confirmar se pregunta solo el método de pago y luego dirección. Sin botón
      ni sugerencias de recogida; botones antiguos ignorados, recogida por texto explícito.
   7. ⏭️ Siguiente: notificaciones al personal, comprobantes y estados del pedido;

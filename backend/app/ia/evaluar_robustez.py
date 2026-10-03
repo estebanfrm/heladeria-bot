@@ -266,7 +266,7 @@ def evaluar(caso, db, proveedor, menu):
             or carrito[0].get("opciones") != esperadas
             or conv.estado is not E.COMPLETANDO_OPCIONES
             or pedidos
-            or "falta 1 de 2" not in respuestas[0].texto
+            or "Elige sabor de helado: 2 de 2" not in respuestas[0].texto
             or "no es una opción" in respuestas[0].texto
         ):
             fallo = "Confundió salsa con sabor, inventó el segundo sabor o no aclaró lo que falta"

@@ -116,9 +116,9 @@ def test_copa_completa_por_listas_repite_sabor_solo_con_otra_eleccion(db, formul
     assert formulario.conv().contexto_json == antes
     assert "2 de 2" in r.texto  # el botón anterior no cuenta como segundo sabor
     r = tocar(formulario, r, "vainilla")
-    assert "Elige salsa: 1 de 1" in r.texto
+    assert r.texto == "*¿Qué salsa quieres?*"
     r = tocar(formulario, r, "frutos_rojos")
-    assert "Elige topping: 1 de 1" in r.texto
+    assert r.texto == "*¿Qué topping quieres?*"
     r = tocar(formulario, r, "oreo")
     assert formulario.conv().estado is E.RESUMEN and "$24.000" in r.texto
     assert len(formulario.proveedor.llamadas) == 1
@@ -133,7 +133,13 @@ def test_paginacion_no_modifica_carrito_y_reiniciar_invalida_listas(db, formular
     r = formulario(items=[{"producto": "copa_queso"}])
     inicial = copy.deepcopy(formulario.conv().contexto_json)
     r = formulario(boton=next(b.id for b in r.botones if b.titulo == "Más opciones →"))
-    assert "Página 2 de 2" in r.texto and formulario.conv().contexto_json == inicial
+    assert formulario.conv().contexto_json == inicial
+    assert {b.id.rsplit(":", 1)[-1] for b in r.botones if b.id.startswith("seleccion:")} == {
+        "lulo",
+        "yogurt_frutos_rojos",
+        "chocolate",
+        "ron_con_pasas",
+    }
     r = formulario(boton=next(b.id for b in r.botones if b.titulo == "← Anteriores"))
     viejo = next(b.id for b in r.botones if b.id.endswith(":vainilla"))
     r = tocar(formulario, r, "vainilla")

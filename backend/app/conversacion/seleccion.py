@@ -68,26 +68,25 @@ def presentar(
     if pagina + 1 < paginas:
         botones.append(Boton(id=f"seleccion-pagina:{token}:{pagina + 1}", titulo="Más opciones →"))
     botones.append(reiniciar(token))
-    elegido = descripcion_item(item)
     etiqueta = f.nombre
     if f.adicional:
         etiqueta = next(a.nombre for a in menu.adicionales if a.id == f.adicional)
-    lineas = [f"*{item.nombre}*" + (f" ({elegido})" if elegido else "")]
-    if item.solicitud.cantidad > 1:
-        lineas.append(f"Estas opciones se aplican a las {item.solicitud.cantidad} unidades.")
-    elegidas = f.cantidad_total - f.cantidad
-    lineas.append(f"Elige {etiqueta.lower()}: {elegidas + 1} de {f.cantidad_total}.")
-    if elegidas:
-        pendiente = "falta" if f.cantidad == 1 else "faltan"
-        lineas.append(f"Te {pendiente} {f.cantidad} de {f.cantidad_total} en este grupo.")
+    pregunta_simple = paso.tipo in {TipoGrupo.SALSA, TipoGrupo.TOPPING}
+    if pregunta_simple:
+        lineas = [f"*¿Qué {etiqueta.lower()} quieres?*"]
+    else:
+        elegido = descripcion_item(item)
+        lineas = [f"*{item.nombre}*" + (f" ({elegido})" if elegido else "")]
+        if item.solicitud.cantidad > 1:
+            lineas.append(f"Estas opciones se aplican a las {item.solicitud.cantidad} unidades.")
+        elegidas = f.cantidad_total - f.cantidad
+        lineas.append(f"Elige {etiqueta.lower()}: {elegidas + 1} de {f.cantidad_total}.")
     if item.problemas:
         lineas.insert(0, f"⚠️ {item.problemas[0].mensaje}")
     if not paso.opciones:
         lineas.append(
             "No hay opciones disponibles para completar este paso. Consulta con el equipo."
         )
-    else:
+    elif not pregunta_simple:
         lineas.append("Pulsa «Ver opciones» y toca tu elección.")
-    if paginas > 1:
-        lineas.append(f"Página {pagina + 1} de {paginas}.")
     return Respuesta(texto="\n".join(lineas), botones=botones, lista=True)
