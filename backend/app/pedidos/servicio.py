@@ -15,7 +15,43 @@ from app.models import (
     Pedido,
     Producto,
 )
-from app.pedidos.carrito import ResultadoCarrito
+from app.pedidos.carrito import AdicionalSolicitado, ItemSolicitado, ResultadoCarrito
+
+
+def editable(pedido: Pedido) -> bool:
+    if pedido.comprobante_url or pedido.estado not in {
+        EstadoPedido.PENDIENTE_PAGO,
+        EstadoPedido.EN_PREPARACION,
+    }:
+        return False
+    return pedido.estado is EstadoPedido.PENDIENTE_PAGO or (
+        pedido.medio_pago is not None and not pedido.medio_pago.requiere_comprobante
+    )
+
+
+def recuperar_carrito(pedido: Pedido) -> list[ItemSolicitado]:
+    carrito = []
+    for item in pedido.items:
+        opciones = {}
+        for elegida in item.opciones:
+            opciones.setdefault(elegida.opcion.grupo.tipo, []).append(elegida.opcion.codigo)
+        carrito.append(
+            ItemSolicitado(
+                producto=item.producto.codigo,
+                cantidad=item.cantidad,
+                opciones=opciones,
+                notas=item.notas or "",
+                adicionales=[
+                    AdicionalSolicitado(
+                        adicional=a.adicional.codigo,
+                        cantidad=a.cantidad,
+                        opcion=a.opcion.codigo if a.opcion else None,
+                    )
+                    for a in item.adicionales
+                ],
+            )
+        )
+    return carrito
 
 
 def crear_pedido(
@@ -26,10 +62,18 @@ def crear_pedido(
     direccion: str | None,
     medio_pago: str,
     estado: EstadoPedido,
+    *,
+    pedido_existente: Pedido | None = None,
 ) -> Pedido:
     """Guarda el pedido con copia de nombres y precios (si el menú cambia, el pedido no)."""
     if not resultado.completo:
         raise ValueError("Solo se registran carritos completos")
+    if pedido_existente is not None and (
+        pedido_existente.cliente_id != conversacion.cliente_id
+        or pedido_existente.conversacion_id != conversacion.id
+        or not editable(pedido_existente)
+    ):
+        raise ValueError("Este pedido no admite cambios automáticos")
 
     productos = {p.codigo: p for p in session.scalars(select(Producto))}
     adicionales = {a.codigo: a for a in session.scalars(select(Adicional))}
@@ -39,17 +83,19 @@ def crear_pedido(
     }
     medio = session.scalars(select(MedioPago).where(MedioPago.codigo == medio_pago)).one()
 
-    pedido = Pedido(
-        cliente=conversacion.cliente,
-        conversacion=conversacion,
-        estado=estado,
-        tipo_entrega=tipo_entrega,
-        subtotal=resultado.subtotal,
-        domicilio=resultado.domicilio,
-        total=resultado.total,
-        direccion=direccion if tipo_entrega is TipoEntrega.DOMICILIO else None,
-        medio_pago=medio,
+    pedido = pedido_existente or Pedido(cliente=conversacion.cliente, conversacion=conversacion)
+    if pedido_existente is not None:
+        pedido.items.clear()
+        session.flush()
+    pedido.estado = estado
+    pedido.tipo_entrega = tipo_entrega
+    pedido.subtotal, pedido.domicilio, pedido.total = (
+        resultado.subtotal,
+        resultado.domicilio,
+        resultado.total,
     )
+    pedido.direccion = direccion if tipo_entrega is TipoEntrega.DOMICILIO else None
+    pedido.medio_pago = medio
     for item in resultado.items:
         pedido.items.append(
             ItemPedido(

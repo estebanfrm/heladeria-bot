@@ -190,7 +190,8 @@ def pagar_transferencia(pedido_id: int, medio: MedioPago, total: int) -> Respues
             f"Pedido *{numero_pedido(pedido_id)}* registrado ✅\n"
             f"Envía *{pesos(total)}* al *{medio.nombre} {medio.cuenta}* a nombre de "
             f"*{medio.titular}* y mándame el comprobante 📸"
-        )
+        ),
+        botones=[Boton(id="cambiar", titulo="Cambiar pedido")],
     )
 
 
@@ -200,7 +201,8 @@ def pagar_al_recibir(pedido_id: int, medio: MedioPago, total: int, tipo: TipoEnt
         texto=(
             f"¡Listo! Tu pedido *{numero_pedido(pedido_id)}* ya está en preparación 🍦\n"
             f"Total a pagar {cuando}: *{pesos(total)}* — {medio.nombre}"
-        )
+        ),
+        botones=[Boton(id="cambiar", titulo="Cambiar pedido")],
     )
 
 
@@ -215,7 +217,8 @@ def esperando_comprobante(pedido_id: int) -> Respuesta:
         texto=(
             f"Estoy esperando la foto del comprobante del pedido *{numero_pedido(pedido_id)}* 📸\n"
             "Si necesitas ayuda, escribe «asesor»."
-        )
+        ),
+        botones=[Boton(id="cambiar", titulo="Cambiar pedido")],
     )
 
 
@@ -246,3 +249,28 @@ def a_humano(por_fallos: bool = False) -> Respuesta:
 
 def cancelado() -> Respuesta:
     return Respuesta(texto="Listo, cancelé tu pedido. Cuando se te antoje algo, aquí estoy 🍦")
+
+
+def condiciones_comerciales() -> Respuesta:
+    return Respuesta(
+        texto="Los precios y adicionales son los del menú. No puedo aplicar descuentos, "
+        "cupones ni promociones que no estén autorizados, ni cambiar un pago por un mensaje. "
+        "Tu pedido conserva sus valores. Si quieres modificar productos, escribe «cambiar pedido»."
+    )
+
+
+def edicion_bloqueada() -> Respuesta:
+    return Respuesta(
+        texto="Ese pedido ya tiene comprobante, pago registrado o despacho, y no puedo "
+        "cambiarlo automáticamente. Para revisarlo, pulsa «Hablar con alguien».",
+        botones=[Boton(id="humano", titulo="Hablar con alguien")],
+    )
+
+
+def pedir_cambio(pedido_id: int) -> Respuesta:
+    return Respuesta(
+        texto=f"¿Qué quieres cambiar del pedido {numero_pedido(pedido_id)}? "
+        "Escríbeme los productos, cantidades o sabores. Guardaré los cambios cuando confirmes "
+        "el nuevo resumen; antes de pagar usa el total actualizado.",
+        botones=[Boton(id="edicion:descartar", titulo="Mantener pedido")],
+    )

@@ -15,6 +15,7 @@ class Intencion(StrEnum):
     SALUDO = "saludo"
     VER_MENU = "ver_menu"
     PEDIDO = "pedido"  # agrega, cambia o completa productos
+    CAMBIAR = "cambiar"  # modificar el pedido existente, nunca crear otro automáticamente
     CONFIRMAR = "confirmar"  # acepta el resumen del pedido
     ENTREGA = "entrega"  # da dirección, dice que recoge o elige medio de pago
     HUMANO = "humano"  # pide hablar con una persona

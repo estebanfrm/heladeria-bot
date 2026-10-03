@@ -47,7 +47,7 @@ def test_prompt_incluye_estado_carrito_y_lo_que_falta(menu_demo):
     assert '"producto":"copa_queso"' in usuario
     assert "Copa queso: salsa ×1, topping ×1" in usuario
     assert "Banana split: sabor de helado ×3, salsa ×1, topping ×1" in usuario
-    assert usuario.endswith('MENSAJE DEL CLIENTE: """copa: frutos rojos y maní"""')
+    assert usuario.endswith('MENSAJE DEL CLIENTE: "copa: frutos rojos y maní"')
 
 
 # --- Leer la respuesta ------------------------------------------------------------

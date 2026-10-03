@@ -16,6 +16,12 @@ from app.config import settings
 from app.conversacion import mensajes
 from app.conversacion.inactividad import ahora_utc, cerrar_si_inactiva
 from app.conversacion.mensajes import Respuesta
+from app.conversacion.protecciones import (
+    CAMBIO,
+    cantidad_invalida,
+    normalizar,
+    restriccion_comercial,
+)
 from app.enums import (
     Canal,
     EstadoConversacion,
@@ -31,7 +37,7 @@ from app.menu.carga import leer_menu
 from app.menu.schema import Menu
 from app.models import Cliente, Conversacion, Mensaje, Pedido
 from app.pedidos.carrito import ItemSolicitado, validar_carrito
-from app.pedidos.servicio import crear_pedido
+from app.pedidos.servicio import crear_pedido, editable, recuperar_carrito
 
 logger = logging.getLogger(__name__)
 
@@ -133,10 +139,44 @@ class Motor:
     def _responder(self, conv: Conversacion, menu: Menu, e: Entrada) -> list[Respuesta]:
         if e.boton:
             return self._boton(conv, menu, e.boton)
-        if e.media_url and conv.estado is E.ESPERANDO_PAGO:
+        if e.media_url and (
+            conv.estado is E.ESPERANDO_PAGO or conv.contexto_json.get("edicion_pedido_id")
+        ):
             return self._comprobante(conv, e.media_url)
         if not e.texto.strip():
             return [mensajes.solo_texto()]
+        if len(e.texto) > settings.bot_max_text_chars:
+            return [
+                Respuesta(
+                    texto=f"Escribe tu mensaje en máximo {settings.bot_max_text_chars} caracteres."
+                )
+            ]
+        if restriccion_comercial(e.texto):
+            return [mensajes.condiciones_comerciales()]
+        if cantidad_invalida(e.texto):
+            return [
+                Respuesta(
+                    texto="La cantidad debe ser un número entero mayor que cero. "
+                    "Para quitar un producto, escribe «quitar» y su nombre."
+                )
+            ]
+
+        texto = normalizar(e.texto)
+        if texto in {"mantener pedido", "cancelar cambio", "dejar el pedido igual"}:
+            return self._descartar_edicion(conv, menu)
+        if conv.estado is E.PEDIDO_CONFIRMADO and (
+            texto in {"nuevo pedido", "otro pedido"} or texto.startswith("ahora ")
+        ):
+            conv.contexto_json = {"carrito": [], "entrega": {}}
+            conv.estado = E.TOMANDO_PEDIDO
+            if texto in {"nuevo pedido", "otro pedido"}:
+                return [mensajes.pedir_texto()]
+        if texto in {"cambiar", "cambiar pedido", "quiero cambiar mi pedido", "camviar pedido"}:
+            return self._iniciar_edicion(conv, menu)
+        if conv.estado in {E.ESPERANDO_PAGO, E.PEDIDO_CONFIRMADO} and CAMBIO.search(texto):
+            r = self._iniciar_edicion(conv, menu)
+            if conv.estado is not E.TOMANDO_PEDIDO:
+                return r
 
         if e.texto.strip().lower() in {"menu", "menú", "ver menu", "ver menú"}:
             return self._carta(conv, menu)
@@ -175,7 +215,12 @@ class Motor:
                 return [mensajes.aclarar_direccion()]
 
         try:
-            interp = interpretar(self.proveedor, menu, e.texto, self._carrito(conv), conv.estado)
+            carrito = self._carrito(conv)
+            if conv.estado in {E.ESPERANDO_PAGO, E.PEDIDO_CONFIRMADO}:
+                pedido = self._pedido_vigente(conv)
+                if pedido is not None:
+                    carrito = recuperar_carrito(pedido)
+            interp = interpretar(self.proveedor, menu, e.texto, carrito, conv.estado)
         except ErrorIA as error:
             logger.warning("La IA falló (conversación %s): %s", conv.id, error)
             return self._fallo(conv)
@@ -191,6 +236,12 @@ class Motor:
             return self._a_humano(conv)
         if i.intencion is Intencion.CANCELAR:
             return self._cancelar(conv)
+        if i.intencion is Intencion.CAMBIAR or (
+            i.items is not None and conv.estado in {E.ESPERANDO_PAGO, E.PEDIDO_CONFIRMADO}
+        ):
+            r = self._iniciar_edicion(conv, menu)
+            if conv.estado is not E.TOMANDO_PEDIDO or (i.items is None and i.entrega is None):
+                return r
         if conv.estado is E.ESPERANDO_PAGO:
             return [mensajes.esperando_comprobante(conv.contexto_json["pedido_id"])]
         if i.intencion is Intencion.VER_MENU:
@@ -201,6 +252,8 @@ class Motor:
 
         if i.entrega is not None:  # se recuerda aunque aún no sea el momento de pedirla
             conv.contexto_json["entrega"] = self._entrega(conv, i.entrega).model_dump(mode="json")
+            if conv.contexto_json.get("edicion_pedido_id") and i.items is None:
+                return self._actualizar_carrito(conv, menu, self._carrito(conv))
         if i.items is not None:
             return self._actualizar_carrito(conv, menu, i.items)
         if conv.estado is E.RESUMEN and (i.intencion is Intencion.CONFIRMAR or i.entrega):
@@ -216,11 +269,19 @@ class Motor:
             )  # botón de un cierre anterior: no vacía otro pedido
         if boton == "humano":
             return self._a_humano(conv)
+        if boton == "cambiar":
+            return self._iniciar_edicion(conv, menu)
+        if boton == "agregar" and conv.estado is E.PEDIDO_CONFIRMADO:
+            return self._iniciar_edicion(conv, menu)
+        if boton == "edicion:descartar":
+            return self._descartar_edicion(conv, menu)
         if conv.estado is E.ESPERANDO_PAGO:
             return [mensajes.esperando_comprobante(conv.contexto_json["pedido_id"])]
         if boton == "menu":
             return self._carta(conv, menu)
         if boton == "pedir":
+            if conv.estado is E.PEDIDO_CONFIRMADO:
+                conv.contexto_json = {"carrito": [], "entrega": {}}
             conv.estado = E.TOMANDO_PEDIDO
             return [mensajes.pedir_texto()]
         if conv.estado is E.RESUMEN:
@@ -254,8 +315,64 @@ class Motor:
 
     # --- Pasos del pedido ----------------------------------------------------------
 
+    def _pedido_vigente(self, conv: Conversacion) -> Pedido | None:
+        id_pedido = conv.contexto_json.get("edicion_pedido_id") or conv.contexto_json.get(
+            "pedido_id"
+        )
+        if not id_pedido:
+            return None
+        return self.session.scalar(
+            select(Pedido)
+            .where(
+                Pedido.id == id_pedido,
+                Pedido.cliente_id == conv.cliente_id,
+                Pedido.conversacion_id == conv.id,
+            )
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+
+    def _iniciar_edicion(self, conv: Conversacion, menu: Menu) -> list[Respuesta]:
+        pedido = self._pedido_vigente(conv)
+        if pedido is None and (
+            conv.contexto_json.get("pedido_id") or conv.contexto_json.get("edicion_pedido_id")
+        ):
+            return [mensajes.edicion_bloqueada()]
+        if pedido is not None:
+            if not editable(pedido):
+                return [mensajes.edicion_bloqueada()]
+            if not conv.contexto_json.get("edicion_pedido_id"):
+                conv.contexto_json["carrito"] = [
+                    i.model_dump(mode="json") for i in recuperar_carrito(pedido)
+                ]
+                conv.contexto_json["entrega"] = DatosEntrega(
+                    tipo=pedido.tipo_entrega,
+                    direccion=pedido.direccion,
+                    medio_pago=pedido.medio_pago.codigo,
+                ).model_dump(mode="json")
+            conv.contexto_json["edicion_pedido_id"] = pedido.id
+            conv.estado = E.TOMANDO_PEDIDO
+            return [mensajes.pedir_cambio(pedido.id)]
+        conv.estado = E.TOMANDO_PEDIDO
+        return [Respuesta(texto="¿Qué quieres cambiar? Escríbeme el pedido como lo quieres ahora.")]
+
+    def _descartar_edicion(self, conv: Conversacion, menu: Menu) -> list[Respuesta]:
+        if not conv.contexto_json.get("edicion_pedido_id"):
+            return self._paso_actual(conv, menu)
+        pedido = self._pedido_vigente(conv)
+        conv.contexto_json.pop("edicion_pedido_id", None)
+        conv.contexto_json.update(carrito=[], entrega={})
+        conv.estado = (
+            E.ESPERANDO_PAGO
+            if pedido
+            and pedido.estado is EstadoPedido.PENDIENTE_PAGO
+            and not pedido.comprobante_url
+            else E.PEDIDO_CONFIRMADO
+        )
+        return [Respuesta(texto="Conservé tu pedido anterior; no se guardaron los cambios.")]
+
     def _carta(self, conv: Conversacion, menu: Menu) -> list[Respuesta]:
-        if conv.estado in INACTIVOS:
+        if conv.estado in INACTIVOS - {E.PEDIDO_CONFIRMADO}:
             conv.estado = E.TOMANDO_PEDIDO
         return [
             mensajes.carta(
@@ -274,11 +391,19 @@ class Motor:
         resultado = validar_carrito(menu, items)
         if resultado.completo:
             conv.estado = E.RESUMEN
-            return [mensajes.resumen(resultado)]
+            r = mensajes.resumen(resultado)
+            if conv.contexto_json.get("edicion_pedido_id"):
+                r.texto = "Revisa los cambios antes de guardarlos.\n" + r.texto
+                r.botones.append(mensajes.Boton(id="edicion:descartar", titulo="Mantener pedido"))
+            return [r]
         conv.estado = E.COMPLETANDO_OPCIONES
         return [mensajes.completar(resultado)]
 
     def _confirmar(self, conv: Conversacion, menu: Menu) -> list[Respuesta]:
+        if conv.contexto_json.get("edicion_pedido_id"):
+            pedido = self._pedido_vigente(conv)
+            if pedido is None or not editable(pedido):
+                return [mensajes.edicion_bloqueada()]
         if not validar_carrito(menu, self._carrito(conv)).completo:
             return self._paso_actual(conv, menu)
         conv.estado = E.DATOS_ENTREGA
@@ -312,12 +437,25 @@ class Motor:
             if medio.requiere_comprobante
             else EstadoPedido.EN_PREPARACION
         )
+        anterior = None
+        if conv.contexto_json.get("edicion_pedido_id"):
+            anterior = self._pedido_vigente(conv)
+            if anterior is None or not editable(anterior):
+                return [mensajes.edicion_bloqueada()]
         pedido = crear_pedido(
-            self.session, conv, resultado, tipo, entrega.direccion, medio.id, estado
+            self.session,
+            conv,
+            resultado,
+            tipo,
+            entrega.direccion,
+            medio.id,
+            estado,
+            pedido_existente=anterior,
         )
         if entrega.direccion:
             conv.cliente.ultima_direccion = entrega.direccion
         conv.contexto_json.pop("direccion_por_confirmar", None)
+        conv.contexto_json.pop("edicion_pedido_id", None)
         conv.contexto_json.update(carrito=[], entrega={}, pedido_id=pedido.id)
 
         if medio.requiere_comprobante:
@@ -327,16 +465,34 @@ class Motor:
         return [mensajes.pagar_al_recibir(pedido.id, medio, pedido.total, tipo)]
 
     def _comprobante(self, conv: Conversacion, media_url: str) -> list[Respuesta]:
-        pedido = self.session.get(Pedido, conv.contexto_json["pedido_id"])
+        pedido = self._pedido_vigente(conv)
+        if pedido is None or pedido.estado is not EstadoPedido.PENDIENTE_PAGO:
+            return [
+                Respuesta(texto="No hay un pago pendiente al que pueda asociar este comprobante.")
+            ]
         pedido.comprobante_url = media_url  # el personal lo verifica (Fase 2)
+        conv.contexto_json.pop("edicion_pedido_id", None)
+        conv.contexto_json.update(carrito=[], entrega={}, pedido_id=pedido.id)
         conv.estado = E.PEDIDO_CONFIRMADO
         return [mensajes.comprobante_recibido()]
 
     def _cancelar(self, conv: Conversacion) -> list[Respuesta]:
+        if conv.contexto_json.get("edicion_pedido_id"):
+            pedido = self._pedido_vigente(conv)
+            if (
+                pedido is None
+                or pedido.estado is not EstadoPedido.PENDIENTE_PAGO
+                or not editable(pedido)
+            ):
+                return self._a_humano(conv)
+            pedido.estado = EstadoPedido.CANCELADO
+            conv.contexto_json.pop("edicion_pedido_id", None)
         if conv.estado is E.PEDIDO_CONFIRMADO:
             return self._a_humano(conv)  # ya mandó comprobante o se está preparando
         if conv.estado is E.ESPERANDO_PAGO:
-            pedido = self.session.get(Pedido, conv.contexto_json["pedido_id"])
+            pedido = self._pedido_vigente(conv)
+            if pedido is None or not editable(pedido):
+                return self._a_humano(conv)
             pedido.estado = EstadoPedido.CANCELADO
         conv.contexto_json.pop("direccion_por_confirmar", None)
         conv.contexto_json.update(carrito=[], entrega={})

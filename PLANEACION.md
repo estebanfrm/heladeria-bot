@@ -591,6 +591,8 @@ WEB_CHAT_MAX_MSGS_PER_SESSION=20
 - [x] Endpoint de prueba `/chat` + pruebas con pytest usando los mensajes del chat real (`app/canales/web.py`: límite de mensajes por sesión, 500 caracteres, sin IA configurada siguen los botones)
 
 ### Fase 2 — Canales
+- [x] Diagnóstico de «Nuevo chat» sin saludo: webhook y reapertura correctos, pero token temporal expirado en Meta (190/463). Renovado el token privado y reiniciado el servidor; añadidas pruebas de reapertura completa por webhook firmado y repetición del botón. Suite actual: 211 aprobadas.
+- [x] Edición del mismo pedido antes del pago/despacho: nuevo resumen y reconfirmación, conservación del número, descarte voluntario de cambios, control del estado al guardar y bloqueo al recibir comprobante. Precios y medios de pago siempre desde el menú. Protecciones contra descuentos inventados, roles falsos, cantidades inválidas/excesivas y JSON adversario. Suite: 209 pruebas aprobadas; 27/27 escenarios con la IA local y 8/8 casos originales. Activado en el bot de prueba. Informe: `docs/PRUEBAS_ROBUSTEZ.md`.
 - [x] Chat web (widget Vue) contra `/chat` — `frontend/`: página de demo + widget (Vue 3, Vite, TS, Pinia, Tailwind 4); CORS por `CORS_ORIGINS`; probado de punta a punta con Ollama (pedido de $24.000)
 - [x] Configurar app en Meta for Developers + número de prueba
 - [x] Webhook de WhatsApp (verificación, firma, recepción, envío)

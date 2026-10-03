@@ -277,12 +277,12 @@ def test_cancelar_despues_del_comprobante_lo_decide_una_persona(db, chat):
     assert db.scalars(select(Pedido)).one().estado is EstadoPedido.PENDIENTE_PAGO
 
 
-def test_esperando_pago_no_se_cambia_el_pedido(db, chat):
+def test_esperando_pago_no_se_cambia_el_pedido_sin_confirmar(db, chat):
     _hasta_esperar_pago(chat)
 
     r = chat("agrégale un cono", ia=_pedir(items=[ItemSolicitado(producto="cono_1")]))
 
-    assert "Estoy esperando la foto del comprobante del pedido *#" in r[0].texto
+    assert "Revisa los cambios antes de guardarlos" in r[0].texto or "Para completar" in r[0].texto
     assert db.scalars(select(Pedido)).one().total == 24000
 
 

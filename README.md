@@ -107,6 +107,13 @@ los mensajes reales lleguen al bot. No usar este túnel temporal para producció
 Los secretos permanecen en `.env`, excluido de Git. Los binarios y registros locales
 de esta configuración se guardan en `.local/`, también excluido de Git.
 
+Si el botón «Nuevo chat» aparece recibido en el historial pero no llega el saludo,
+revisar el envío a Meta: el token temporal puede haber vencido aunque los webhooks
+sigan entrando. El error 190 con subcódigo 463 indica una sesión expirada. Generar
+un identificador nuevo en el Paso 1, actualizar `WA_ACCESS_TOKEN` en `.env` y reiniciar
+el backend. Después se puede pulsar de nuevo el botón, sin recuperar el carrito anterior.
+El token permanente para producción sigue pendiente.
+
 ### Menú en PDF
 
 Guardar el archivo en `.local/menu.pdf` y configurar `WA_MENU_PDF_FILE=.local/menu.pdf`
@@ -147,6 +154,50 @@ cuando hay varios procesos. La sesión también vence al volver a escribir despu
 de una interrupción del servidor.
 
 ## Ejecutar pruebas
+
+### Cambiar un pedido y conservar sus precios
+
+El cliente puede pulsar «Cambiar pedido» o escribir «cambiar pedido», también después
+de confirmar un pedido pendiente de pago. En efectivo o datáfono se permite mientras
+no conste pago, comprobante o despacho. Se recuperan los productos y datos de entrega;
+el bot presenta un nuevo resumen y guarda los cambios solo al confirmarlo, conservando
+el número del pedido. «Mantener pedido» descarta el borrador de cambios.
+
+El servidor vuelve a comprobar el estado al guardar. Un comprobante recibido durante
+la edición se asocia al pedido original, conserva su importe y descarta el borrador.
+Recibir una imagen o «ya pagué» nunca verifica el pago. Verificar comprobantes y
+notificar al personal siguen pendientes en la Fase 3; «Hablar con alguien» activa
+el modo humano, pero todavía no envía una notificación a un asesor.
+
+Descuentos, cupones, promociones inventadas y roles administrativos escritos por
+el cliente no alteran importes. Los precios y cuentas se toman del menú y la BD;
+los campos de precio, total o estado generados por la IA se ignoran. Las cantidades
+deben ser enteros positivos; `ORDER_MAX_UNITS=50` limita unidades y adicionales,
+`ORDER_MAX_ITEMS=20` limita líneas de productos y `BOT_MAX_TEXT_CHARS=500` limita
+el texto por mensaje. Los pedidos mayores requieren consultar al equipo.
+
+Los errores ortográficos claros se interpretan con IA y se revisan en el resumen.
+Las elecciones incompletas se preguntan y los productos inexistentes no se sustituyen
+por otro. Una opción única que la IA entregue como texto se normaliza a una lista
+de un elemento y conserva la validación contra el menú.
+
+### Evaluar mensajes con la IA real
+
+Desde `backend/`, `uv run python -m app.ia.evaluar_robustez` ejecuta 27 escenarios
+con el proveedor configurado. Usa siempre `seeds/demo.json`, clientes ficticios y
+transacciones revertidas en `heladeria_test`; no envía WhatsApp ni registra pedidos
+reales. Guarda mensajes, respuestas, JSON del modelo y resultados en
+`.local/robustez.json`, excluido de Git. `--casos copa_keso malteada` permite repetir
+casos concretos y `--salida ../.local/robustez-final.json` elige otro informe.
+
+Si Ollama falla con `std::bad_alloc`, revisar memoria y caché antes de atribuirlo
+a la interpretación. En este portátil se configuró `gemma4-heladeria:12b` a partir
+de `gemma4:12b`, con `num_ctx=4096` y `num_batch=64`, y se inició el servidor con
+`LLAMA_ARG_CACHE_RAM=0` y `LLAMA_ARG_CTX_CHECKPOINTS=0`. Es un ajuste local del mismo
+modelo; debe conservarse al reiniciar Ollama. Los parámetros del modelo se pueden
+configurar con su [API oficial de creación](https://docs.ollama.com/api/create).
+
+### Pruebas automáticas
 
 ```bash
 docker compose up -d db   # los tests de modelos/migraciones usan Postgres real (BD heladeria_test)
