@@ -77,8 +77,7 @@ def test_conversacion_real_completa(db, chat):
     assert [b.id for b in r[0].botones] == ["menu", "pedir", "humano"]
 
     r = chat(CASO["pedido_inicial"].mensaje, ia=CASO["pedido_inicial"].ideal)
-    assert "*Copa queso* (brownie, fresa)" in r[0].texto
-    assert "Elige salsa: 1 de 1" in r[0].texto and r[0].lista
+    assert r[0].texto == "*¿Qué salsa quieres?*" and r[0].lista
     assert {b.titulo for b in r[0].botones} >= {"Frutos rojos", "Maracuyá", "Lecherita"}
     assert "Banana split" not in r[0].texto  # una elección por paso
     assert _conv(db).estado is E.COMPLETANDO_OPCIONES
@@ -261,7 +260,7 @@ def test_problemas_del_carrito_se_explican(db, chat):
     r = chat("copa queso con salsa de mora", ia=_pedir(items=[copa]))
 
     assert r[0].texto.startswith("⚠️ 'mora' no es una opción de salsa para Copa queso.")
-    assert "Elige salsa: 1 de 1" in r[0].texto and r[0].lista
+    assert "*¿Qué salsa quieres?*" in r[0].texto and r[0].lista
     assert {b.titulo for b in r[0].botones} >= {"Frutos rojos", "Maracuyá", "Lecherita"}
     assert _conv(db).estado is E.COMPLETANDO_OPCIONES
 

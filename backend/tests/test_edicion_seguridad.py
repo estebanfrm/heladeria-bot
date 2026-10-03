@@ -69,7 +69,7 @@ def test_salsa_clasificada_como_sabor_no_se_atasca_ni_inventa_segundo_sabor(
     assert conv(db).contexto_json["carrito"][0]["opciones"] == esperado
     assert conv(db).estado is E.COMPLETANDO_OPCIONES
     assert "no es una opción" not in r[0].texto
-    assert "falta 1 de 2" in r[0].texto
+    assert "Elige sabor de helado: 2 de 2" in r[0].texto
     bot(
         "Sabor Vainilla\nSalsa frutos rojos\nToping oreo triturado",
         ia=pedir("copa_queso", opciones=opciones),

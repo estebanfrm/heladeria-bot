@@ -184,7 +184,10 @@ de un elemento y conserva la validación contra el menú.
 En WhatsApp las opciones se eligen con listas, una por paso: primer sabor, segundo
 sabor si corresponde, salsa y topping. Los once sabores se muestran en páginas con
 «Más opciones» y «Anteriores»; no hay que escribirlos ni ver todos los grupos juntos.
-La selección muestra lo ya elegido, valida disponibilidad y repeticiones en cada toque,
+En sabores se muestra lo ya elegido sin repetir cuántos faltan ni el número de página.
+Salsa y topping muestran solo la pregunta en negrilla y la lista de opciones.
+«Más opciones» muestra los sabores restantes y «Anteriores» vuelve a los primeros,
+conservando las elecciones. Cada toque valida disponibilidad y repeticiones,
 y permite «Elegir de nuevo» antes de confirmar. Las listas anteriores no cambian un
 carrito nuevo ni un pedido ya registrado. El chat web conserva las preguntas por texto.
 
